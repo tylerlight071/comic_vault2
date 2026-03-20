@@ -119,17 +119,15 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   // ── Status check (preview mode) ───────────────────────────────────────────
 
   Future<void> _checkStatus() async {
-    final owned =
-        await DatabaseService.instance.comicExists(_comic.comicVineId);
-    final wish =
-        await DatabaseService.instance.isOnWishlist(_comic.comicVineId);
+    final status =
+        await DatabaseService.instance.checkComicStatus(_comic.comicVineId);
     if (!mounted) return;
     setState(() {
-      _inLibrary = owned;
-      _inWishlist = wish;
-      _checking = false;
+      _inLibrary  = status.inLibrary;
+      _inWishlist = status.inWishlist;
+      _checking   = false;
     });
-    if (!owned) {
+    if (!status.inLibrary) {
       final enriched = await _enrichCredits(_comic);
       if (mounted && enriched != _comic) setState(() => _comic = enriched);
     }

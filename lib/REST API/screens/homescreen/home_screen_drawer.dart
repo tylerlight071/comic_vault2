@@ -38,6 +38,7 @@ class _AppDrawer extends StatelessWidget {
   final VoidCallback onWishlist;
   final VoidCallback onLibrary;
   final VoidCallback onStats;
+  final VoidCallback onReadingLog;
   final VoidCallback onSettings;
   final VoidCallback onScan;
   final void Function(String seriesName, String volumeId) onSeriesRunTap;
@@ -50,6 +51,7 @@ class _AppDrawer extends StatelessWidget {
     required this.onWishlist,
     required this.onLibrary,
     required this.onStats,
+    required this.onReadingLog,
     required this.onSettings,
     required this.onScan,
     required this.onSeriesRunTap,
@@ -208,6 +210,11 @@ class _AppDrawer extends StatelessWidget {
                 icon: Icons.bar_chart_rounded,
                 label: 'Stats',
                 onTap: onStats,
+              ),
+              _DrawerItem(
+                icon: Icons.history_edu_rounded,
+                label: 'Reading Log',
+                onTap: onReadingLog,
               ),
 
               // ── Top series ──────────────────────────────────────────────

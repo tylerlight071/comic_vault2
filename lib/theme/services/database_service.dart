@@ -294,6 +294,22 @@ class DatabaseService {
     return rows.isNotEmpty;
   }
 
+  /// Returns `(inLibrary, inWishlist)` in a single DB round-trip.
+  Future<({bool inLibrary, bool inWishlist})> checkComicStatus(
+      String comicVineId) async {
+    final rows = await _database.query('comics',
+        columns: ['isWishlisted'],
+        where: 'comicVineId = ?',
+        whereArgs: [comicVineId]);
+    bool inLibrary  = false;
+    bool inWishlist = false;
+    for (final r in rows) {
+      if ((r['isWishlisted'] as int) == 0) inLibrary  = true;
+      if ((r['isWishlisted'] as int) == 1) inWishlist = true;
+    }
+    return (inLibrary: inLibrary, inWishlist: inWishlist);
+  }
+
   Future<Comic?> getComicByVineId(String comicVineId) async {
     final rows = await _database.query('comics',
         where: 'comicVineId = ? AND isWishlisted = 0',
@@ -328,9 +344,17 @@ class DatabaseService {
   }
 
   Future<void> addToWishlist(Comic comic) async {
-    if (await comicExists(comic.comicVineId)) return;
-    if (await isOnWishlist(comic.comicVineId)) return;
-    await insertComic(comic.copyWith(isWishlisted: true));
+    // Single-query check + insert inside a transaction to avoid TOCTOU races.
+    await _database.transaction((txn) async {
+      final existing = await txn.query('comics',
+          columns: ['id'],
+          where: 'comicVineId = ?',
+          whereArgs: [comic.comicVineId],
+          limit: 1);
+      if (existing.isNotEmpty) return; // already in library or wishlist
+      await txn.insert('comics', comic.copyWith(isWishlisted: true).toMap(),
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    });
   }
 
   Future<void> removeFromWishlist(String comicVineId) async {

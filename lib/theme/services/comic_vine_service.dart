@@ -396,7 +396,8 @@ class ComicVineService {
   final Map<String, (List<Comic>, DateTime)> _volumeIssuesCache = {};
   static const Duration _volumeCacheTtl = Duration(minutes: 15);
 
-  Future<List<Comic>> getVolumeIssues(String volumeId) async {
+  Future<List<Comic>> getVolumeIssues(String volumeId,
+      {void Function(int loaded, int total)? onProgress}) async {
     final cached = _volumeIssuesCache[volumeId];
     if (cached != null && DateTime.now().difference(cached.$2) < _volumeCacheTtl) {
       return cached.$1;
@@ -406,7 +407,11 @@ class ComicVineService {
     final allIssues = <Comic>[];
     int offset      = 0;
     const limit     = 100;
-    while (true) {
+    // Hard cap at 1 200 issues (~12 pages) to prevent runaway fetches for
+    // long-running series like Action Comics (1 000+ issues).
+    const maxIssues = 1200;
+
+    while (allIssues.length < maxIssues) {
       final uri = Uri.parse('$_base/issues/').replace(queryParameters: {
         'api_key':    key,
         'format':     'json',
@@ -422,6 +427,7 @@ class ComicVineService {
           .toList();
       allIssues.addAll(results);
       final total = body['number_of_total_results'] as int? ?? 0;
+      onProgress?.call(allIssues.length.clamp(0, total), total);
       offset += limit;
       if (offset >= total || results.isEmpty) break;
     }

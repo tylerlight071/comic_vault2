@@ -44,6 +44,9 @@ class _SeriesRunScreenState extends State<SeriesRunScreen>
   Set<String> _readIds     = {};
   bool _loading = true;
   String? _error;
+  // Fetch progress for large series (null = indeterminate)
+  int? _fetchLoaded;
+  int? _fetchTotal;
 
   late final AnimationController _progressCtrl;
   late Animation<double> _progressAnim;
@@ -97,11 +100,18 @@ class _SeriesRunScreenState extends State<SeriesRunScreen>
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _fetchLoaded = null; _fetchTotal = null; });
     try {
       // Start all three fetches concurrently — API call and two DB reads are
       // independent so there is no reason to await them sequentially.
-      final issuesFuture     = ComicVineService.instance.getVolumeIssues(widget.volumeId);
+      final issuesFuture = ComicVineService.instance.getVolumeIssues(
+        widget.volumeId,
+        onProgress: (loaded, total) {
+          if (mounted && total > 100) {
+            setState(() { _fetchLoaded = loaded; _fetchTotal = total; });
+          }
+        },
+      );
       final ownedFuture      = DatabaseService.instance.getOwnedIds();
       final wishlistedFuture = DatabaseService.instance.getWishlistIds();
       final readFuture       = DatabaseService.instance.getReadIds();
@@ -432,21 +442,59 @@ class _SeriesRunScreenState extends State<SeriesRunScreen>
 
   // ── Loading ───────────────────────────────────────────────────────────────
 
-  Widget _buildLoading() => SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => const _SkeletonIssueRow()
-                .animate(
-                  delay: Duration(milliseconds: i * 45),
-                  onPlay: (c) => c.repeat(),
-                )
-                .shimmer(
-                  duration: 1400.ms,
-                  color: AppColors.skeletonHighlight.withOpacity(0.3),
+  Widget _buildLoading() => SliverToBoxAdapter(
+        child: Column(
+          children: [
+            // Show fetch progress for large series (>100 issues)
+            if (_fetchTotal != null && _fetchTotal! > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Fetching issues…',
+                            style: tUi(12, color: AppColors.textTertiary)),
+                        Text('$_fetchLoaded / $_fetchTotal',
+                            style: tUi(12, color: AppColors.textTertiary)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: _fetchLoaded! / _fetchTotal!,
+                        backgroundColor: AppColors.surface2,
+                        valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                        minHeight: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-            childCount: 10,
-          ),
+              ),
+            SizedBox(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Column(
+                  children: List.generate(
+                    10,
+                    (i) => const _SkeletonIssueRow()
+                        .animate(
+                          delay: Duration(milliseconds: i * 45),
+                          onPlay: (c) => c.repeat(),
+                        )
+                        .shimmer(
+                          duration: 1400.ms,
+                          color: AppColors.skeletonHighlight.withOpacity(0.3),
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
 

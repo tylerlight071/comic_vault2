@@ -33,6 +33,7 @@ import '../series_tracker_screen.dart';
 import '../library_screen.dart';
 import '../series_run_screen.dart';
 import '../stats_screen.dart';
+import '../reading_log_screen.dart';
 
 part 'home_screen_drawer.dart';
 part 'home_screen_header.dart';
@@ -426,6 +427,18 @@ void _warmPalette(List<Comic> comics) {
             ));
       });
 
+  void _openReadingLog() => _drawerNav(() {
+        AppHaptics.select();
+        Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const ReadingLogScreen(),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+              transitionDuration: const Duration(milliseconds: 280),
+            ));
+      });
+
   void _openSettings() => _drawerNav(() {
         AppHaptics.select();
         Navigator.push(
@@ -460,6 +473,7 @@ void _warmPalette(List<Comic> comics) {
         onWishlist: _openWishlist,
         onLibrary: _openLibrary,
         onStats: _openStats,
+        onReadingLog: _openReadingLog,
         onSettings: _openSettings,
         onScan: () => _drawerNav(_openScanner),
         onSeriesRunTap: _openSeriesRun,
