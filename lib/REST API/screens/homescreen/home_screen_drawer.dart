@@ -32,20 +32,24 @@ class _SeriesEntry {
 
 class _AppDrawer extends StatelessWidget {
   final List<Comic> all;
+  final int wishlistCount;
   final VoidCallback onSearch;
   final VoidCallback onSeriesTracker;
   final VoidCallback onWishlist;
   final VoidCallback onLibrary;
+  final VoidCallback onStats;
   final VoidCallback onSettings;
   final VoidCallback onScan;
   final void Function(String seriesName, String volumeId) onSeriesRunTap;
 
   const _AppDrawer({
     required this.all,
+    required this.wishlistCount,
     required this.onSearch,
     required this.onSeriesTracker,
     required this.onWishlist,
     required this.onLibrary,
+    required this.onStats,
     required this.onSettings,
     required this.onScan,
     required this.onSeriesRunTap,
@@ -197,7 +201,13 @@ class _AppDrawer extends StatelessWidget {
               _DrawerItem(
                 icon: Icons.bookmark_rounded,
                 label: 'Wishlist',
+                badge: wishlistCount > 0 ? '$wishlistCount' : null,
                 onTap: onWishlist,
+              ),
+              _DrawerItem(
+                icon: Icons.bar_chart_rounded,
+                label: 'Stats',
+                onTap: onStats,
               ),
 
               // ── Top series ──────────────────────────────────────────────

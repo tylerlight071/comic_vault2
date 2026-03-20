@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math' show sqrt;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/comic.dart';
 import 'database_service.dart';
 
@@ -50,7 +51,11 @@ class ComicVineService {
   static const String _hardcodedApiKey =
       'd2d3800b8f0302c128ea8e91995e6adb27a30a9e';
 
-  Future<String> _apiKey() async => _hardcodedApiKey;
+  Future<String> _apiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    final custom = prefs.getString('comic_vine_api_key')?.trim();
+    return (custom != null && custom.isNotEmpty) ? custom : _hardcodedApiKey;
+  }
 
   Future<Map<String, dynamic>> _get(Uri uri) async {
     final response = await http
@@ -169,6 +174,107 @@ class ComicVineService {
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  // ── Barcode → exact comic ─────────────────────────────────────────────────
+  //
+  // Uses the 5-digit supplement (if present) to extract the issue number, then
+  // does a structured Comic Vine volumes + issues query for a precise match
+  // rather than a fuzzy text search.
+
+  Future<Comic?> lookupByBarcode(String rawBarcode) async {
+    final clean = rawBarcode.replaceAll(RegExp(r'[^\d]'), '');
+
+    // Split into main UPC and optional 5-digit supplement
+    String mainBarcode = clean;
+    String? supplement;
+    if (clean.length == 17) {
+      mainBarcode = clean.substring(0, 12);
+      supplement  = clean.substring(12);
+    } else if (clean.length == 18) {
+      mainBarcode = clean.substring(0, 13);
+      supplement  = clean.substring(13);
+    }
+
+    // Local DB first
+    final local = await DatabaseService.instance.getComicByBarcode(mainBarcode);
+    if (local != null) {
+      await DatabaseService.instance
+          .addBarcodeScan(mainBarcode, comicVineId: local.comicVineId);
+      return local;
+    }
+
+    await DatabaseService.instance.addBarcodeScan(mainBarcode);
+
+    // Extract issue number from supplement — format is IIIxx where III = issue
+    String? issueNumber;
+    if (supplement != null && supplement.length == 5) {
+      final n = int.tryParse(supplement.substring(0, 3));
+      if (n != null) issueNumber = n.toString(); // strips leading zeros
+    }
+
+    // UPC lookup for series name
+    final seriesName = await lookupUPC(mainBarcode);
+
+    if (seriesName != null && issueNumber != null) {
+      // Most precise path: find the volume then filter issues by number
+      final comic = await _lookupExactIssue(seriesName, issueNumber);
+      if (comic != null) return comic;
+    }
+
+    if (seriesName != null) {
+      // Fallback: ranked text search using the series name
+      final result = await search(seriesName, limit: 1);
+      return result.comics.isNotEmpty ? result.comics.first : null;
+    }
+
+    return null; // Could not resolve — caller should show search screen
+  }
+
+  /// Searches Comic Vine for a volume matching [seriesName], then queries
+  /// the issues endpoint filtered by [issueNumber] to get the exact issue.
+  Future<Comic?> _lookupExactIssue(
+      String seriesName, String issueNumber) async {
+    final key = await _apiKey();
+
+    // Step 1 — find matching volumes
+    final volUri =
+        Uri.parse('$_base/search/').replace(queryParameters: {
+      'api_key':    key,
+      'format':     'json',
+      'query':      seriesName,
+      'resources':  'volume',
+      'field_list': 'id,name',
+      'limit':      '5',
+    });
+
+    final volBody   = await _get(volUri);
+    final volumes   = (volBody['results'] as List<dynamic>)
+        .where((r) => r['resource_type'] == 'volume')
+        .toList();
+
+    if (volumes.isEmpty) return null;
+
+    // Step 2 — for each volume (up to 3) look for the issue
+    for (final vol in volumes.take(3)) {
+      final volumeId = vol['id'].toString();
+      final issueUri =
+          Uri.parse('$_base/issues/').replace(queryParameters: {
+        'api_key':    key,
+        'format':     'json',
+        'filter':     'volume:$volumeId,issue_number:$issueNumber',
+        'field_list': _issueFields,
+        'limit':      '1',
+      });
+
+      final issueBody = await _get(issueUri);
+      final results   = issueBody['results'] as List<dynamic>;
+      if (results.isNotEmpty) {
+        return _parseIssue(results.first as Map<String, dynamic>);
+      }
+    }
+
+    return null;
+  }
 
   Future<String?> lookupUPC(String upc) async {
     try {

@@ -3,9 +3,11 @@
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -19,34 +21,6 @@ import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/skeleton_box.dart';
 import 'comic_detail_screen.dart';
-
-// ── Typography ────────────────────────────────────────────────────────────────
-
-TextStyle _display(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w700,
-        double? height,
-        double letterSpacing = -0.5}) =>
-    GoogleFonts.playfairDisplay(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
 
 // ── Suggestion model ──────────────────────────────────────────────────────────
 
@@ -76,11 +50,15 @@ class _SeriesSuggestion {
 class SearchResultsScreen extends StatefulWidget {
   final String initialQuery;
   final VoidCallback onComicAdded;
+  final String? notFoundBarcode;
+  final Map<String, dynamic>? wrongComicReport;
 
   const SearchResultsScreen({
     super.key,
     required this.initialQuery,
     required this.onComicAdded,
+    this.notFoundBarcode,
+    this.wrongComicReport,
   });
 
   @override
@@ -115,6 +93,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Set<String> _ownedIds   = {};
   Set<String> _wishlistIds = {};
 
+  Map<String, dynamic>? _pendingReport;
+  String? _pendingBarcode; // barcode that couldn't be resolved — awaiting user mapping
+
   static const int _pageSize = 20;
 
   bool get _hasActiveFilters =>
@@ -130,11 +111,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         setState(() => _showSuggestions = false);
       }
     });
+    _pendingReport = widget.wrongComicReport;
+    _pendingBarcode = widget.notFoundBarcode;
     _loadStatus();
     _loadSearchHistory();
     if (widget.initialQuery.isNotEmpty) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _search(widget.initialQuery));
+    } else if (widget.notFoundBarcode != null) {
+      // Barcode scan failed — focus the field so the user can type immediately
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _focusNode.requestFocus());
     }
   }
 
@@ -371,7 +358,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 16, 4),
                 child: Row(children: [
                   Text('Filter Results',
-                      style: _display(18,
+                      style: tDisplay(18,
                           weight: FontWeight.w700, letterSpacing: -0.3)),
                   const Spacer(),
                   if (tempMinRating != null ||
@@ -397,7 +384,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Text('Reset',
-                            style: _ui(12,
+                            style: tUi(12,
                                 color: AppColors.textSecondary,
                                 weight: FontWeight.w500)),
                       ),
@@ -417,7 +404,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text('SHOW',
-                    style: _ui(10,
+                    style: tUi(10,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w700,
                         letterSpacing: 1.4)),
@@ -455,7 +442,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text('MINIMUM RATING',
-                    style: _ui(10,
+                    style: tUi(10,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w700,
                         letterSpacing: 1.4)),
@@ -515,7 +502,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           size: 18),
                       const SizedBox(width: 12),
                       Text('Include Wishlist',
-                          style: _ui(14,
+                          style: tUi(14,
                               color: tempIncludeWishlist
                                   ? AppColors.textPrimary
                                   : AppColors.textSecondary,
@@ -571,7 +558,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ),
                     child: Center(
                       child: Text('Apply',
-                          style: _ui(15,
+                          style: tUi(15,
                               color: AppColors.bg,
                               weight: FontWeight.w700)),
                     ),
@@ -611,7 +598,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           ),
           child: Center(
             child: Text(label,
-                style: _ui(13,
+                style: tUi(13,
                     color: active
                         ? AppColors.textPrimary
                         : AppColors.textSecondary,
@@ -649,7 +636,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
           ),
           child: Text(label,
-              style: _ui(13,
+              style: tUi(13,
                   color: active
                       ? AppColors.textPrimary
                       : AppColors.textSecondary,
@@ -663,6 +650,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   void _openDetail(Comic comic) {
     AppHaptics.light();
+    // If a barcode was unresolved, map it to this comic
+    if (_pendingBarcode != null) {
+      final barcode = _pendingBarcode!;
+      setState(() => _pendingBarcode = null);
+      DatabaseService.instance.mapBarcodeToComic(barcode, comic.comicVineId);
+      // Only send the "new mapping" log if this isn't a wrong-comic correction
+      // (wrong-comic corrections get their own follow-up message below)
+      if (_pendingReport == null) {
+        _sendNewBarcodeMappingLog(barcode, comic);
+      }
+    }
+
+    // If this selection follows a wrong-comic report, send the follow-up
+    if (_pendingReport != null) {
+      _sendCorrectComicFollowUp(_pendingReport!, comic);
+      setState(() => _pendingReport = null);
+    }
+
     final isOwned = _ownedIds.contains(comic.comicVineId);
     if (isOwned) {
       DatabaseService.instance.getComicByVineId(comic.comicVineId).then((owned) {
@@ -680,6 +685,83 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         mode: ComicDetailMode.preview,
       )));
     }
+  }
+
+  static const String _reportWebhookUrl =
+      'https://discord.com/api/webhooks/1484505399796301854/nDqqB2-mpQ3PEi6CdsOvztDsMUpRUNBHTFsXO7jaUtlqWmgiNZjmper1UctNV0-PfG27';
+
+  void _sendNewBarcodeMappingLog(String barcode, Comic comic) async {
+    final label =
+        '${comic.seriesName} #${comic.issueNumber ?? "?"} — ${comic.title}';
+    try {
+      await http
+          .post(
+            Uri.parse(_reportWebhookUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'embeds': [
+                {
+                  'title': '🔗 New barcode mapping',
+                  'color': 0x3498DB,
+                  'fields': [
+                    {'name': 'Barcode', 'value': barcode, 'inline': true},
+                    {'name': 'Mapped to', 'value': label, 'inline': false},
+                  ],
+                  'footer': {'text': 'Comic Vault'},
+                  'timestamp': DateTime.now().toIso8601String(),
+                }
+              ]
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
+  void _sendCorrectComicFollowUp(
+      Map<String, dynamic> report, Comic correct) async {
+    final correctLabel =
+        '${correct.seriesName} #${correct.issueNumber ?? "?"} — ${correct.title}';
+    try {
+      await http
+          .post(
+            Uri.parse(_reportWebhookUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'embeds': [
+                {
+                  'title': '✅ User selected correct comic',
+                  'color': 0x2ECC71,
+                  'fields': [
+                    {
+                      'name': 'Barcode',
+                      'value': report['barcode'] ?? '—',
+                      'inline': true
+                    },
+                    {
+                      'name': 'Was wrongly returned as',
+                      'value': report['wrongComicLabel'] ?? '—',
+                      'inline': false
+                    },
+                    {
+                      'name': 'User chose',
+                      'value': correctLabel,
+                      'inline': false
+                    },
+                    if ((report['note'] as String?)?.isNotEmpty == true)
+                      {
+                        'name': 'User note',
+                        'value': report['note'],
+                        'inline': false
+                      },
+                  ],
+                  'footer': {'text': 'Comic Vault'},
+                  'timestamp': report['timestamp'],
+                }
+              ]
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {}
   }
 
   void _pickSuggestion(_SeriesSuggestion s) {
@@ -710,6 +792,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       body: Column(children: [
         _buildHeader(),
         if (_showSuggestions) _buildSuggestions(),
+        if (widget.notFoundBarcode != null && _lastQuery.isEmpty)
+          _buildNotFoundBanner(),
         Expanded(child: _buildBody()),
       ]),
     );
@@ -744,7 +828,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: const Icon(Icons.arrow_back_ios_rounded,
-                      color: AppColors.textSecondary, size: 16),
+                      color: AppColors.textSecondary, size: 16,
+                      semanticLabel: 'Back'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -777,12 +862,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         controller: _queryCtrl,
                         focusNode: _focusNode,
                         autofocus: widget.initialQuery.isEmpty,
-                        style: _ui(15, weight: FontWeight.w400),
+                        style: tUi(15, weight: FontWeight.w400),
                         cursorColor: AppColors.textSecondary,
                         cursorWidth: 1.5,
                         decoration: InputDecoration(
                           hintText: 'Title, series, or barcode…',
-                          hintStyle: _ui(15,
+                          hintStyle: tUi(15,
                               color: AppColors.textDisabled,
                               weight: FontWeight.w400),
                           border: InputBorder.none,
@@ -899,7 +984,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       size: 12),
                   const SizedBox(width: 6),
                   Text(s.displayLabel,
-                      style: _ui(12,
+                      style: tUi(12,
                           color: AppColors.textSecondary,
                           weight: FontWeight.w500)),
                 ]),
@@ -922,6 +1007,42 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     return _buildResults();
   }
 
+  // ── Barcode not found banner ──────────────────────────────────────────────
+
+  Widget _buildNotFoundBanner() => Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(children: [
+          Icon(Icons.qr_code_rounded, color: AppColors.textTertiary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Barcode not recognised',
+                  style: tUi(13,
+                      color: AppColors.textPrimary, weight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Search by title or series name to find the right comic.',
+                  style: tUi(12,
+                      color: AppColors.textSecondary,
+                      weight: FontWeight.w400,
+                      height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ]),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0);
+
   // ── Idle — history list ───────────────────────────────────────────────────
 
   Widget _buildIdleHistory() {
@@ -943,13 +1064,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
             const SizedBox(height: 24),
             Text('Search Comic Vine',
-                style: _display(20,
+                style: tDisplay(20,
                     weight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 10),
             Text(
               'Start typing to search titles,\nseries, or creators.',
               textAlign: TextAlign.center,
-              style: _ui(13,
+              style: tUi(13,
                   color: AppColors.textTertiary,
                   weight: FontWeight.w400,
                   height: 1.55),
@@ -967,7 +1088,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
             child: Row(children: [
               Text('RECENT SEARCHES',
-                  style: _ui(10,
+                  style: tUi(10,
                       color: AppColors.textDisabled,
                       weight: FontWeight.w700,
                       letterSpacing: 1.6)),
@@ -981,7 +1102,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 haptic: HapticStyle.none,
                 scaleDown: 0.9,
                 child: Text('Clear all',
-                    style: _ui(12,
+                    style: tUi(12,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w500)),
               ),
@@ -1016,12 +1137,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(query,
-                            style: _ui(14,
+                            style: tUi(14,
                                 color: AppColors.textSecondary,
                                 weight: FontWeight.w500)),
                       ),
                       Text('$count results',
-                          style: _ui(12,
+                          style: tUi(12,
                               color: AppColors.textDisabled,
                               weight: FontWeight.w400)),
                       const SizedBox(width: 8),
@@ -1104,7 +1225,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             '${'★' * _minRating!}+ rating',
                           if (!_includeWishlist) 'No wishlist',
                         ].join(' · '),
-                        style: _ui(11,
+                        style: tUi(11,
                             color: AppColors.textTertiary,
                             weight: FontWeight.w500),
                       ),
@@ -1135,26 +1256,26 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
               child: RichText(
                 text: TextSpan(
-                  style: _ui(12,
+                  style: tUi(12,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w400),
                   children: [
                     const TextSpan(text: 'Showing '),
                     TextSpan(
                         text: '${_results.length}',
-                        style: _ui(12,
+                        style: tUi(12,
                             color: AppColors.textSecondary,
                             weight: FontWeight.w700)),
                     const TextSpan(text: ' of '),
                     TextSpan(
                         text: '$_total',
-                        style: _ui(12,
+                        style: tUi(12,
                             color: AppColors.textSecondary,
                             weight: FontWeight.w700)),
                     const TextSpan(text: ' for '),
                     TextSpan(
                         text: '"$_lastQuery"',
-                        style: _ui(12,
+                        style: tUi(12,
                             color: AppColors.textTertiary,
                             weight: FontWeight.w500)),
                   ],
@@ -1217,13 +1338,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                       MainAxisAlignment.center,
                                   children: [
                                     Text('Load more',
-                                        style: _ui(13,
+                                        style: tUi(13,
                                             color: AppColors.textSecondary,
                                             weight: FontWeight.w600)),
                                     const SizedBox(width: 6),
                                     Text(
                                       '(${_total - _results.length} remaining)',
-                                      style: _ui(12,
+                                      style: tUi(12,
                                           color: AppColors.textTertiary,
                                           weight: FontWeight.w400),
                                     ),
@@ -1237,7 +1358,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Text(
                           _results.isEmpty ? '' : 'All $_total results shown',
-                          style: _ui(12,
+                          style: tUi(12,
                               color: AppColors.textDisabled,
                               weight: FontWeight.w400),
                         ),
@@ -1267,12 +1388,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
             const SizedBox(height: 24),
             Text('Search failed',
-                style: _display(20,
+                style: tDisplay(20,
                     weight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 10),
             Text(_error!,
                 textAlign: TextAlign.center,
-                style: _ui(13,
+                style: tUi(13,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w400,
                     height: 1.55)),
@@ -1290,7 +1411,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Text('Try Again',
-                    style: _ui(14,
+                    style: tUi(14,
                         color: AppColors.textSecondary,
                         weight: FontWeight.w600)),
               ),
@@ -1316,13 +1437,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
             const SizedBox(height: 24),
             Text('No results found',
-                style: _display(20,
+                style: tDisplay(20,
                     weight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 10),
             Text(
               'Try a series name, issue title,\nor writer.',
               textAlign: TextAlign.center,
-              style: _ui(13,
+              style: tUi(13,
                   color: AppColors.textTertiary,
                   weight: FontWeight.w400,
                   height: 1.55),
@@ -1449,7 +1570,7 @@ class _ResultCardState extends State<_ResultCard> {
                 children: [
                   Text(
                     comic.seriesName,
-                    style: _ui(11,
+                    style: tUi(11,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w500),
                     maxLines: 1,
@@ -1460,7 +1581,7 @@ class _ResultCardState extends State<_ResultCard> {
                     comic.title.isNotEmpty
                         ? comic.title
                         : 'Issue #${comic.issueNumber ?? "?"}',
-                    style: _ui(14,
+                    style: tUi(14,
                         color: AppColors.textPrimary,
                         weight: FontWeight.w700,
                         height: 1.25),
@@ -1512,7 +1633,7 @@ class _ResultCardState extends State<_ResultCard> {
         ),
         child: Text(
           label,
-          style: _ui(10,
+          style: tUi(10,
               color:
                   dim ? AppColors.textTertiary : AppColors.textSecondary,
               weight: FontWeight.w600),

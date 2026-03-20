@@ -16,7 +16,7 @@ class DatabaseService {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       join(dbPath, 'comic_vault.db'),
-      version: 6,
+      version: 7,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE comics (
@@ -36,7 +36,11 @@ class DatabaseService {
             isRead          INTEGER NOT NULL DEFAULT 0,
             starRating      INTEGER NOT NULL DEFAULT 0,
             isWishlisted    INTEGER NOT NULL DEFAULT 0,
-            addedDate       TEXT    NOT NULL
+            addedDate       TEXT    NOT NULL,
+            readDate        TEXT,
+            isReading       INTEGER NOT NULL DEFAULT 0,
+            notes           TEXT,
+            condition       TEXT
           )
         ''');
 
@@ -179,6 +183,12 @@ class DatabaseService {
             }
           } catch (_) {}
         }
+        if (oldVersion < 7) {
+          try { await db.execute('ALTER TABLE comics ADD COLUMN readDate TEXT'); } catch (_) {}
+          try { await db.execute('ALTER TABLE comics ADD COLUMN isReading INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+          try { await db.execute('ALTER TABLE comics ADD COLUMN notes TEXT'); } catch (_) {}
+          try { await db.execute('ALTER TABLE comics ADD COLUMN condition TEXT'); } catch (_) {}
+        }
       },
     );
   }
@@ -263,10 +273,17 @@ class DatabaseService {
     } catch (_) {}
   }
 
-  Future<void> deleteComic(int id) =>
-      _database.delete('comics', where: 'id = ?', whereArgs: [id]);
+  Future<void> deleteComic(int id) async {
+    await _database.delete('comics', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database.delete('comics_fts', where: 'rowid = ?', whereArgs: [id]);
+    } catch (_) {}
+  }
 
-  Future<void> deleteAllComics() => _database.delete('comics');
+  Future<void> deleteAllComics() async {
+    await _database.delete('comics');
+    try { await _database.delete('comics_fts'); } catch (_) {}
+  }
 
   Future<bool> comicExists(String comicVineId) async {
     final rows = await _database.query('comics',
@@ -304,6 +321,12 @@ class DatabaseService {
     return rows.isNotEmpty;
   }
 
+  Future<int> getWishlistCount() async {
+    final rows = await _database.rawQuery(
+        'SELECT COUNT(*) AS cnt FROM comics WHERE isWishlisted = 1');
+    return (rows.first['cnt'] as int?) ?? 0;
+  }
+
   Future<void> addToWishlist(Comic comic) async {
     if (await comicExists(comic.comicVineId)) return;
     if (await isOnWishlist(comic.comicVineId)) return;
@@ -333,6 +356,13 @@ class DatabaseService {
   Future<Set<String>> getWishlistIds() async {
     final rows = await _database.query('comics',
         columns: ['comicVineId'], where: 'isWishlisted = 1');
+    return rows.map((r) => r['comicVineId'] as String).toSet();
+  }
+
+  Future<Set<String>> getReadIds() async {
+    final rows = await _database.query('comics',
+        columns: ['comicVineId'],
+        where: 'isWishlisted = 0 AND isRead = 1');
     return rows.map((r) => r['comicVineId'] as String).toSet();
   }
 
@@ -560,4 +590,20 @@ class DatabaseService {
 
   Future<void> clearBarcodeHistory() async =>
       _database.delete('barcode_history');
+
+  /// Records a user-confirmed barcode → comic mapping.
+  /// Updates barcode_history and, if the comic is already in the library,
+  /// stamps the barcode onto the comics row so future scans resolve instantly.
+  Future<void> mapBarcodeToComic(String barcode, String comicVineId) async {
+    // Update / insert the barcode_history entry with the confirmed comicVineId
+    await addBarcodeScan(barcode, comicVineId: comicVineId);
+
+    // If the comic is already owned, stamp the barcode onto it
+    await _database.update(
+      'comics',
+      {'barcode': barcode},
+      where: 'comicVineId = ? AND (barcode IS NULL OR barcode = "")',
+      whereArgs: [comicVineId],
+    );
+  }
 }

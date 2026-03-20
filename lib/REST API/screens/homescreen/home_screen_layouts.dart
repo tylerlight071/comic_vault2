@@ -10,18 +10,22 @@ part of 'home_screen.dart';
 
 class _FeaturedLayout extends StatelessWidget {
   final List<Comic> all;
+  final List<Comic> currentlyReading;
   final List<Comic> recentlyAdded;
   final List<Comic> continueReading;
   final List<Comic> topRated;
   final Comic? featuredComic;
+  final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
   const _FeaturedLayout({
     required this.all,
+    required this.currentlyReading,
     required this.recentlyAdded,
     required this.continueReading,
     required this.topRated,
     required this.featuredComic,
+    required this.shelves,
     required this.cb,
   });
 
@@ -65,29 +69,48 @@ class _FeaturedLayout extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: Column(children: [
-                if (recentlyAdded.isNotEmpty) ...[
+                if (shelves.showCurrentlyReading && currentlyReading.isNotEmpty) ...[
                   _Shelf(
-                    title: 'Recently Added',
-                    comics: recentlyAdded,
+                    title: 'Currently Reading',
+                    comics: currentlyReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: currentlyReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.recentlyAdded,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (continueReading.isNotEmpty) ...[
+                if (shelves.showRecentlyAdded && recentlyAdded.isNotEmpty) ...[
+                  _Shelf(
+                    title: 'Recently Added',
+                    comics: recentlyAdded,
+                    onTap: cb.onComicTap,
+                    onSeeAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    shelfType: _ShelfType.recentlyAdded,
+                  ),
+                  const SizedBox(height: 36),
+                ],
+                if (shelves.showContinueReading && continueReading.isNotEmpty) ...[
                   _Shelf(
                     title: 'Continue Reading',
                     comics: continueReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: continueReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.continueReading,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (topRated.isNotEmpty) ...[
+                if (shelves.showTopRated && topRated.isNotEmpty) ...[
                   _Shelf(
                     title: 'Top Rated',
                     comics: topRated,
                     onTap: cb.onComicTap,
+                    onSeeAll: topRated.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.topRated,
                   ),
                   const SizedBox(height: 36),
@@ -321,16 +344,20 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
 
 class _ShelvesLayout extends StatelessWidget {
   final List<Comic> all;
+  final List<Comic> currentlyReading;
   final List<Comic> recentlyAdded;
   final List<Comic> continueReading;
   final List<Comic> topRated;
+  final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
   const _ShelvesLayout({
     required this.all,
+    required this.currentlyReading,
     required this.recentlyAdded,
     required this.continueReading,
     required this.topRated,
+    required this.shelves,
     required this.cb,
   });
 
@@ -359,29 +386,48 @@ class _ShelvesLayout extends StatelessWidget {
                   children: [
                 const SizedBox(height: 4),
                 _ReadingProgressRibbon(all: all),
-                if (recentlyAdded.isNotEmpty) ...[
+                if (shelves.showCurrentlyReading && currentlyReading.isNotEmpty) ...[
                   _Shelf(
-                    title: 'Recently Added',
-                    comics: recentlyAdded,
+                    title: 'Currently Reading',
+                    comics: currentlyReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: currentlyReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.recentlyAdded,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (continueReading.isNotEmpty) ...[
+                if (shelves.showRecentlyAdded && recentlyAdded.isNotEmpty) ...[
+                  _Shelf(
+                    title: 'Recently Added',
+                    comics: recentlyAdded,
+                    onTap: cb.onComicTap,
+                    onSeeAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    shelfType: _ShelfType.recentlyAdded,
+                  ),
+                  const SizedBox(height: 36),
+                ],
+                if (shelves.showContinueReading && continueReading.isNotEmpty) ...[
                   _Shelf(
                     title: 'Continue Reading',
                     comics: continueReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: continueReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.continueReading,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (topRated.isNotEmpty) ...[
+                if (shelves.showTopRated && topRated.isNotEmpty) ...[
                   _Shelf(
                     title: 'Top Rated',
                     comics: topRated,
                     onTap: cb.onComicTap,
+                    onSeeAll: topRated.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.topRated,
                   ),
                   const SizedBox(height: 36),
@@ -401,16 +447,20 @@ class _ShelvesLayout extends StatelessWidget {
 
 class _MosaicLayout extends StatelessWidget {
   final List<Comic> all;
+  final List<Comic> currentlyReading;
   final List<Comic> recentlyAdded;
   final List<Comic> continueReading;
   final List<Comic> topRated;
+  final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
   const _MosaicLayout({
     required this.all,
+    required this.currentlyReading,
     required this.recentlyAdded,
     required this.continueReading,
     required this.topRated,
+    required this.shelves,
     required this.cb,
   });
 
@@ -443,29 +493,48 @@ class _MosaicLayout extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                if (recentlyAdded.isNotEmpty) ...[
+                if (shelves.showCurrentlyReading && currentlyReading.isNotEmpty) ...[
                   _Shelf(
-                    title: 'Recently Added',
-                    comics: recentlyAdded,
+                    title: 'Currently Reading',
+                    comics: currentlyReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: currentlyReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.recentlyAdded,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (continueReading.isNotEmpty) ...[
+                if (shelves.showRecentlyAdded && recentlyAdded.isNotEmpty) ...[
+                  _Shelf(
+                    title: 'Recently Added',
+                    comics: recentlyAdded,
+                    onTap: cb.onComicTap,
+                    onSeeAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    shelfType: _ShelfType.recentlyAdded,
+                  ),
+                  const SizedBox(height: 36),
+                ],
+                if (shelves.showContinueReading && continueReading.isNotEmpty) ...[
                   _Shelf(
                     title: 'Continue Reading',
                     comics: continueReading,
                     onTap: cb.onComicTap,
+                    onSeeAll: continueReading.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.continueReading,
                   ),
                   const SizedBox(height: 36),
                 ],
-                if (topRated.isNotEmpty) ...[
+                if (shelves.showTopRated && topRated.isNotEmpty) ...[
                   _Shelf(
                     title: 'Top Rated',
                     comics: topRated,
                     onTap: cb.onComicTap,
+                    onSeeAll: topRated.length > 6
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))
+                        : null,
                     shelfType: _ShelfType.topRated,
                   ),
                   const SizedBox(height: 36),

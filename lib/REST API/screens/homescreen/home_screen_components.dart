@@ -242,6 +242,7 @@ class _Shelf extends StatelessWidget {
   final String title;
   final List<Comic> comics;
   final void Function(Comic) onTap;
+  final VoidCallback? onSeeAll;
   final bool showSkeleton;
   final _ShelfType shelfType;
 
@@ -249,6 +250,7 @@ class _Shelf extends StatelessWidget {
     required this.title,
     required this.comics,
     required this.onTap,
+    this.onSeeAll,
     this.shelfType = _ShelfType.recentlyAdded,
     this.showSkeleton = false,
   });
@@ -279,7 +281,21 @@ class _Shelf extends StatelessWidget {
                   style: tDisplay(18,
                       weight: FontWeight.w700, letterSpacing: -0.4)),
               const Spacer(),
-              if (comics.length > 6)
+              if (onSeeAll != null)
+                Pressable(
+                  onTap: onSeeAll!,
+                  haptic: HapticStyle.light,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('See all',
+                        style: tUi(12,
+                            color: AppColors.textTertiary,
+                            weight: FontWeight.w600)),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: AppColors.textDisabled, size: 14),
+                  ]),
+                )
+              else if (comics.length > 6)
                 Text('${comics.length}',
                     style: tUi(12,
                         color: AppColors.textTertiary,

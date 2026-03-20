@@ -19,6 +19,9 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/models/comic.dart';
 import '../../../theme/services/cover_palette_service.dart';
 import '../../../theme/services/database_service.dart';
+import '../../../theme/models/home_layout.dart';
+import '../../../theme/models/shelf_config.dart';
+import '../../../theme/services/comic_vine_service.dart';
 import '../../../theme/utils/haptics.dart';
 import 'home_typography.dart';
 import '../scanner_screen.dart';
@@ -29,6 +32,7 @@ import '../settings_screen.dart';
 import '../series_tracker_screen.dart';
 import '../library_screen.dart';
 import '../series_run_screen.dart';
+import '../stats_screen.dart';
 
 part 'home_screen_drawer.dart';
 part 'home_screen_header.dart';
@@ -51,12 +55,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Comic> _all = [];
   bool _loading = true;
-  HomeLayout _layout = HomeLayout.featured;
+  HomeLayout  _layout  = HomeLayout.featured;
+  ShelfConfig _shelves = const ShelfConfig();
 
   // Cached shelf lists — computed once after each load, not on every build().
-  List<Comic> _recentlyAdded  = [];
-  List<Comic> _continueReading = [];
-  List<Comic> _topRated        = [];
+  int         _wishlistCount    = 0;
+  List<Comic> _currentlyReading = [];
+  List<Comic> _recentlyAdded    = [];
+  List<Comic> _continueReading  = [];
+  List<Comic> _topRated         = [];
   Comic?      _featuredComic;
 
   // How many comics to show in the Recently Added shelf. Enough to give a
@@ -67,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadLayout();
+    _loadShelfConfig();
     _load();
   }
 
@@ -74,6 +82,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final idx = prefs.getInt('home_layout') ?? 0;
     if (mounted) setState(() => _layout = HomeLayout.values[idx.clamp(0, 2)]);
+  }
+
+  Future<void> _loadShelfConfig() async {
+    final config = await ShelfConfig.load();
+    if (mounted) setState(() => _shelves = config);
   }
 
   Future<void> _setLayout(HomeLayout l) async {
@@ -84,10 +97,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final comics = await DatabaseService.instance.getAllComics();
+    final results = await Future.wait([
+      DatabaseService.instance.getAllComics(),
+      DatabaseService.instance.getWishlistCount(),
+    ]);
+    final comics = results[0] as List<Comic>;
+    final wCount = results[1] as int;
     if (mounted) {
       setState(() {
         _all = comics;
+        _wishlistCount = wCount;
         _loading = false;
         _updateShelves(comics);
       });
@@ -98,10 +117,16 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Refreshes data without showing the loading skeleton — used after edits or
   /// returning from sub-screens so the home screen stays visible while updating.
   Future<void> _silentRefresh() async {
-    final comics = await DatabaseService.instance.getAllComics();
+    final results = await Future.wait([
+      DatabaseService.instance.getAllComics(),
+      DatabaseService.instance.getWishlistCount(),
+    ]);
+    final comics = results[0] as List<Comic>;
+    final wCount = results[1] as int;
     if (mounted) {
       setState(() {
         _all = comics;
+        _wishlistCount = wCount;
         _updateShelves(comics);
       });
       _warmPalette(comics);
@@ -138,9 +163,19 @@ void _warmPalette(List<Comic> comics) {
     return sorted.take(_recentlyAddedLimit).toList();
   }
 
-  List<Comic> _computeContinueReading(List<Comic> comics) =>
-      (comics.where((c) => !c.isRead).toList()
+  List<Comic> _computeCurrentlyReading(List<Comic> comics) =>
+      (comics.where((c) => c.isReading).toList()
         ..sort((a, b) => b.addedDate.compareTo(a.addedDate)));
+
+  List<Comic> _computeContinueReading(List<Comic> comics) =>
+      (comics.where((c) => !c.isRead && !c.isReading).toList()
+        ..sort((a, b) {
+          final s = a.seriesName.compareTo(b.seriesName);
+          if (s != 0) return s;
+          final ai = double.tryParse(a.issueNumber ?? '') ?? 0;
+          final bi = double.tryParse(b.issueNumber ?? '') ?? 0;
+          return ai.compareTo(bi);
+        }));
 
   List<Comic> _computeTopRated(List<Comic> comics) =>
       (comics.where((c) => c.starRating > 0).toList()
@@ -156,10 +191,11 @@ void _warmPalette(List<Comic> comics) {
   }
 
   void _updateShelves(List<Comic> comics) {
-    _recentlyAdded   = _computeRecentlyAdded(comics);
-    _continueReading = _computeContinueReading(comics);
-    _topRated        = _computeTopRated(comics);
-    _featuredComic   = _computeFeaturedComic(comics);
+    _currentlyReading = _computeCurrentlyReading(comics);
+    _recentlyAdded    = _computeRecentlyAdded(comics);
+    _continueReading  = _computeContinueReading(comics);
+    _topRated         = _computeTopRated(comics);
+    _featuredComic    = _computeFeaturedComic(comics);
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -174,11 +210,77 @@ void _warmPalette(List<Comic> comics) {
     final barcode = await Navigator.push<String>(
         context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
     if (!mounted || barcode == null) return;
-    await Navigator.push(
+
+    // Show a loading indicator while we resolve the barcode
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Strip supplement for fallback search query (just the main UPC)
+    final mainBarcode = barcode.length == 17
+        ? barcode.substring(0, 12)
+        : barcode.length == 18
+            ? barcode.substring(0, 13)
+            : barcode;
+
+    try {
+      final comic = await ComicVineService.instance.lookupByBarcode(barcode);
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loader
+
+      if (comic != null) {
+        await Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => ComicDetailScreen(
+              comic: comic,
+              onUpdated: _silentRefresh,
+              mode: ComicDetailMode.preview,
+              fromBarcode: true,
+              barcode: mainBarcode,
+              onWrongComic: (reportData) => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => SearchResultsScreen(
+                          initialQuery: '',
+                          onComicAdded: _silentRefresh,
+                          notFoundBarcode: mainBarcode,
+                          wrongComicReport: reportData,
+                        )),
+              ),
+            ),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+        );
+      } else {
+        // Could not resolve — open search with an empty query and a banner
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => SearchResultsScreen(
+                    initialQuery: '',
+                    onComicAdded: _silentRefresh,
+                    notFoundBarcode: mainBarcode,
+                  )),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      await Navigator.push(
         context,
         MaterialPageRoute(
             builder: (_) => SearchResultsScreen(
-                initialQuery: barcode, onComicAdded: _silentRefresh)));
+                  initialQuery: '',
+                  onComicAdded: _silentRefresh,
+                  notFoundBarcode: mainBarcode,
+                )),
+      );
+    }
   }
 
   void _openSearch() {
@@ -261,6 +363,18 @@ void _warmPalette(List<Comic> comics) {
             ));
       });
 
+  void _openStats() => _drawerNav(() {
+        AppHaptics.select();
+        Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const StatsScreen(),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+              transitionDuration: const Duration(milliseconds: 280),
+            ));
+      });
+
   void _openSettings() => _drawerNav(() {
         AppHaptics.select();
         Navigator.push(
@@ -274,7 +388,10 @@ void _warmPalette(List<Comic> comics) {
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 280),
-            )).then((_) => _loadLayout());
+            )).then((_) async {
+              await _loadLayout();
+              await _loadShelfConfig();
+            });
       });
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -286,10 +403,12 @@ void _warmPalette(List<Comic> comics) {
       backgroundColor: AppColors.bg,
       drawer: _AppDrawer(
         all: _all,
+        wishlistCount: _wishlistCount,
         onSearch: () => _drawerNav(_openSearch),
         onSeriesTracker: _openSeriesTracker,
         onWishlist: _openWishlist,
         onLibrary: _openLibrary,
+        onStats: _openStats,
         onSettings: _openSettings,
         onScan: () => _drawerNav(_openScanner),
         onSeriesRunTap: _openSeriesRun,
@@ -310,24 +429,30 @@ void _warmPalette(List<Comic> comics) {
       case HomeLayout.featured:
         return _FeaturedLayout(
             all: _all,
+            currentlyReading: _currentlyReading,
             recentlyAdded: _recentlyAdded,
             continueReading: _continueReading,
             topRated: _topRated,
             featuredComic: _featuredComic,
+            shelves: _shelves,
             cb: cb);
       case HomeLayout.shelves:
         return _ShelvesLayout(
             all: _all,
+            currentlyReading: _currentlyReading,
             recentlyAdded: _recentlyAdded,
             continueReading: _continueReading,
             topRated: _topRated,
+            shelves: _shelves,
             cb: cb);
       case HomeLayout.mosaic:
         return _MosaicLayout(
             all: _all,
+            currentlyReading: _currentlyReading,
             recentlyAdded: _recentlyAdded,
             continueReading: _continueReading,
             topRated: _topRated,
+            shelves: _shelves,
             cb: cb);
     }
   }

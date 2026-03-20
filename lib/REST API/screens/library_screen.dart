@@ -4,8 +4,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -18,34 +18,6 @@ import '../../theme/models/comic.dart';
 import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import 'comic_detail_screen.dart';
-
-// ── Typography ────────────────────────────────────────────────────────────────
-
-TextStyle _display(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w700,
-        double? height,
-        double letterSpacing = -0.5}) =>
-    GoogleFonts.playfairDisplay(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -71,14 +43,15 @@ extension _SortModeLabel on _SortMode {
   }
 }
 
-enum _FilterMode { all, read, unread }
+enum _FilterMode { all, read, unread, reading }
 
 extension _FilterModeLabel on _FilterMode {
   String get label {
     switch (this) {
-      case _FilterMode.all:    return 'All';
-      case _FilterMode.read:   return 'Read';
-      case _FilterMode.unread: return 'Unread';
+      case _FilterMode.all:     return 'All';
+      case _FilterMode.read:    return 'Read';
+      case _FilterMode.unread:  return 'Unread';
+      case _FilterMode.reading: return 'Reading';
     }
   }
 }
@@ -174,8 +147,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   List<Comic> _computeFiltered() {
     var list = List.of(_all);
 
-    if (_filter == _FilterMode.read)   list = list.where((c) => c.isRead).toList();
-    if (_filter == _FilterMode.unread) list = list.where((c) => !c.isRead).toList();
+    if (_filter == _FilterMode.read)    list = list.where((c) => c.isRead).toList();
+    if (_filter == _FilterMode.unread)  list = list.where((c) => !c.isRead).toList();
+    if (_filter == _FilterMode.reading) list = list.where((c) => c.isReading).toList();
 
     final q = _query.trim().toLowerCase();
     if (q.isNotEmpty) {
@@ -309,7 +283,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   child: Row(
                     children: [
                       Text('Sort & Filter',
-                          style: _display(18,
+                          style: tDisplay(18,
                               weight: FontWeight.w700, letterSpacing: -0.3)),
                       const Spacer(),
                       // Reset button — only visible when something is non-default
@@ -334,7 +308,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Text('Reset',
-                                style: _ui(12,
+                                style: tUi(12,
                                     color: AppColors.textSecondary,
                                     weight: FontWeight.w500)),
                           ),
@@ -355,7 +329,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text('SORT BY',
-                      style: _ui(10,
+                      style: tUi(10,
                           color: AppColors.textTertiary,
                           weight: FontWeight.w700,
                           letterSpacing: 1.4)),
@@ -398,7 +372,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                     : AppColors.textTertiary),
                             const SizedBox(width: 6),
                             Text(s.label,
-                                style: _ui(13,
+                                style: tUi(13,
                                     color: active
                                         ? AppColors.textPrimary
                                         : AppColors.textSecondary,
@@ -418,7 +392,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text('SHOW',
-                      style: _ui(10,
+                      style: tUi(10,
                           color: AppColors.textTertiary,
                           weight: FontWeight.w700,
                           letterSpacing: 1.4)),
@@ -468,7 +442,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               ),
                               child: Center(
                                 child: Text(f.label,
-                                    style: _ui(13,
+                                    style: tUi(13,
                                         color: active
                                             ? AppColors.textPrimary
                                             : AppColors.textSecondary,
@@ -509,7 +483,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ),
                       child: Center(
                         child: Text('Apply',
-                            style: _ui(15,
+                            style: tUi(15,
                                 color: AppColors.bg,
                                 weight: FontWeight.w700)),
                       ),
@@ -588,7 +562,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                 border: Border.all(color: AppColors.border),
               ),
               child: const Icon(Icons.arrow_back_ios_rounded,
-                  color: AppColors.textSecondary, size: 16),
+                  color: AppColors.textSecondary, size: 16,
+                  semanticLabel: 'Back'),
             ),
           ),
         ),
@@ -597,7 +572,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('MY COLLECTION',
-                style: _ui(10,
+                style: tUi(10,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w700,
                     letterSpacing: 1.6)),
@@ -607,13 +582,13 @@ class _LibraryScreenState extends State<LibraryScreen>
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text('Library',
-                    style: _display(17,
+                    style: tDisplay(17,
                         weight: FontWeight.w700, letterSpacing: -0.4)),
                 if (total > 0) ...[
                   const SizedBox(width: 10),
                   Text(
                     '$total comics · $read read',
-                    style: _ui(11,
+                    style: tUi(11,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w400),
                   ),
@@ -648,6 +623,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       : Icons.grid_view_rounded,
                   color: AppColors.textSecondary,
                   size: 17,
+                  semanticLabel: _view == _ViewMode.grid
+                      ? 'Switch to list view'
+                      : 'Switch to grid view',
                 ),
               ),
             ),
@@ -680,12 +658,12 @@ class _LibraryScreenState extends State<LibraryScreen>
                   Expanded(
                     child: TextField(
                       controller: _searchCtrl,
-                      style: _ui(14, weight: FontWeight.w400),
+                      style: tUi(14, weight: FontWeight.w400),
                       cursorColor: AppColors.textSecondary,
                       cursorWidth: 1.5,
                       decoration: InputDecoration(
                         hintText: 'Search your library…',
-                        hintStyle: _ui(14,
+                        hintStyle: tUi(14,
                             color: AppColors.textDisabled,
                             weight: FontWeight.w400),
                         border: InputBorder.none,
@@ -740,6 +718,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           ? AppColors.textPrimary
                           : AppColors.textSecondary,
                       size: 18,
+                      semanticLabel: 'Sort and filter',
                     ),
                   ),
                   // Active-state indicator dot
@@ -784,7 +763,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       if (_sort != _SortMode.dateAdded) _sort.label,
                       if (_filter != _FilterMode.all) _filter.label,
                     ].join(' · '),
-                    style: _ui(11,
+                    style: tUi(11,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w500),
                   ),
@@ -918,7 +897,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             _query.isNotEmpty || _filter != _FilterMode.all
                 ? 'No results'
                 : 'Your library is empty',
-            style: _display(22,
+            style: tDisplay(22,
                 weight: FontWeight.w700, letterSpacing: -0.4)),
           const SizedBox(height: 10),
           Text(
@@ -926,7 +905,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ? 'Try adjusting your search\nor filter.'
                 : 'Search for comics and add them\nto start building your collection.',
             textAlign: TextAlign.center,
-            style: _ui(14,
+            style: tUi(14,
                 color: AppColors.textTertiary,
                 weight: FontWeight.w400,
                 height: 1.55),
@@ -1007,7 +986,7 @@ class _SeriesGroupState extends State<_SeriesGroup> {
                     children: [
                       Text(
                         widget.seriesName,
-                        style: _ui(14,
+                        style: tUi(14,
                             color: AppColors.textPrimary,
                             weight: FontWeight.w700,
                             height: 1.2),
@@ -1079,7 +1058,7 @@ class _SeriesGroupState extends State<_SeriesGroup> {
     ),
     child: Text(
       label,
-      style: _ui(10,
+      style: tUi(10,
           color: color ?? AppColors.textTertiary,
           weight: FontWeight.w600),
     ),
@@ -1190,7 +1169,7 @@ class _IssueRow extends StatelessWidget {
                 if (comic.issueNumber != null)
                   Text(
                     'Issue #${comic.issueNumber}',
-                    style: _ui(10,
+                    style: tUi(10,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w600,
                         letterSpacing: 0.3),
@@ -1198,7 +1177,7 @@ class _IssueRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   comic.title.isNotEmpty ? comic.title : comic.seriesName,
-                  style: _ui(13,
+                  style: tUi(13,
                       color: AppColors.textPrimary,
                       weight: FontWeight.w600,
                       height: 1.3),
@@ -1209,7 +1188,7 @@ class _IssueRow extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     '${comic.publicationYear}',
-                    style: _ui(11,
+                    style: tUi(11,
                         color: AppColors.textDisabled,
                         weight: FontWeight.w400),
                   ),
@@ -1232,7 +1211,7 @@ class _IssueRow extends StatelessWidget {
                         color: AppColors.green_(0.2)),
                   ),
                   child: Text('Read',
-                      style: _ui(10,
+                      style: tUi(10,
                           color: AppColors.greenOwned,
                           weight: FontWeight.w600)),
                 )
@@ -1246,7 +1225,7 @@ class _IssueRow extends StatelessWidget {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Text('Unread',
-                      style: _ui(10,
+                      style: tUi(10,
                           color: AppColors.textDisabled,
                           weight: FontWeight.w500)),
                 ),
@@ -1257,7 +1236,7 @@ class _IssueRow extends StatelessWidget {
                       color: AppColors.gold, size: 11),
                   const SizedBox(width: 3),
                   Text('${comic.starRating}',
-                      style: _ui(11,
+                      style: tUi(11,
                           color: AppColors.textSecondary,
                           weight: FontWeight.w600)),
                 ]),

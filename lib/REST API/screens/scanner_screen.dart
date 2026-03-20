@@ -62,17 +62,15 @@ class _ScannerScreenState extends State<ScannerScreen>
   String? _validateAndNormalizeBarcode(String raw) {
     var clean = raw.replaceAll(RegExp(r'[^\d]'), '');
 
-    // Comic barcodes are UPC-A (12) or EAN-13 (13). Scanners sometimes
-    // return the main barcode concatenated with a 2 or 5-digit supplement
-    // (issue/edition info), producing 14, 15, 17, or 18 digits. Strip the
-    // supplement so we're left with the standard 12 or 13-digit barcode.
-    if (clean.length == 14 || clean.length == 17) {
-      clean = clean.substring(0, 12); // UPC-A + supplement
-    } else if (clean.length == 15 || clean.length == 18) {
-      clean = clean.substring(0, 13); // EAN-13 + supplement
-    }
+    // Strip 2-digit supplements (not useful for comic issue lookup)
+    if (clean.length == 14) clean = clean.substring(0, 12);
+    else if (clean.length == 15) clean = clean.substring(0, 13);
 
-    if (clean.length != 8 && clean.length != 12 && clean.length != 13) {
+    // 17 = UPC-A (12) + 5-digit supplement (encodes issue number)
+    // 18 = EAN-13 (13) + 5-digit supplement
+    // Keep these intact — the supplement is used to identify the exact issue.
+    if (clean.length != 8 && clean.length != 12 && clean.length != 13 &&
+        clean.length != 17 && clean.length != 18) {
       return null;
     }
     return clean;

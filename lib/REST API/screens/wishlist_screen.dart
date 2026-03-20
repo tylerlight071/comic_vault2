@@ -4,8 +4,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -17,34 +17,6 @@ import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 import 'comic_detail_screen.dart';
-
-// ── Typography ────────────────────────────────────────────────────────────────
-
-TextStyle _display(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w700,
-        double? height,
-        double letterSpacing = -0.5}) =>
-    GoogleFonts.playfairDisplay(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +64,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Removed from wishlist',
-            style: _ui(13, color: AppColors.textPrimary)),
+            style: tUi(13, color: AppColors.textPrimary)),
         backgroundColor: AppColors.snackbar,
         behavior: SnackBarBehavior.floating,
         shape:
@@ -193,7 +165,8 @@ class _WishlistScreenState extends State<WishlistScreen> {
                 border: Border.all(color: AppColors.border),
               ),
               child: const Icon(Icons.arrow_back_ios_rounded,
-                  color: AppColors.textSecondary, size: 16),
+                  color: AppColors.textSecondary, size: 16,
+                  semanticLabel: 'Back'),
             ),
           ),
         ),
@@ -202,7 +175,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('SAVED ISSUES',
-                style: _ui(10,
+                style: tUi(10,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w700,
                     letterSpacing: 1.6)),
@@ -212,12 +185,12 @@ class _WishlistScreenState extends State<WishlistScreen> {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text('Wishlist',
-                    style: _display(17,
+                    style: tDisplay(17,
                         weight: FontWeight.w700, letterSpacing: -0.4)),
                 if (_items.isNotEmpty) ...[
                   const SizedBox(width: 10),
                   Text('${_items.length}',
-                      style: _ui(11,
+                      style: tUi(11,
                           color: AppColors.textTertiary,
                           weight: FontWeight.w400)),
                 ],
@@ -248,12 +221,12 @@ class _WishlistScreenState extends State<WishlistScreen> {
                 Expanded(
                   child: TextField(
                     controller: _searchCtrl,
-                    style: _ui(14, weight: FontWeight.w400),
+                    style: tUi(14, weight: FontWeight.w400),
                     cursorColor: AppColors.textSecondary,
                     cursorWidth: 1.5,
                     decoration: InputDecoration(
                       hintText: 'Search wishlist…',
-                      hintStyle: _ui(14,
+                      hintStyle: tUi(14,
                           color: AppColors.textDisabled,
                           weight: FontWeight.w400),
                       border: InputBorder.none,
@@ -364,13 +337,13 @@ class _WishlistScreenState extends State<WishlistScreen> {
               ),
               const SizedBox(height: 26),
               Text('Nothing saved yet',
-                  style: _display(22,
+                  style: tDisplay(22,
                       weight: FontWeight.w700, letterSpacing: -0.4)),
               const SizedBox(height: 10),
               Text(
                 'Search for comics and tap the\nbookmark icon to save them here.',
                 textAlign: TextAlign.center,
-                style: _ui(14,
+                style: tUi(14,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w400,
                     height: 1.55),
@@ -399,13 +372,13 @@ class _WishlistScreenState extends State<WishlistScreen> {
               ),
               const SizedBox(height: 24),
               Text('No results',
-                  style: _display(20,
+                  style: tDisplay(20,
                       weight: FontWeight.w700, letterSpacing: -0.3)),
               const SizedBox(height: 10),
               Text(
                 'Try a different title or series name.',
                 textAlign: TextAlign.center,
-                style: _ui(13,
+                style: tUi(13,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w400,
                     height: 1.55),
@@ -536,7 +509,7 @@ class _WishlistCardState extends State<_WishlistCard> {
               children: [
                 Text(
                   comic.seriesName,
-                  style: _ui(11,
+                  style: tUi(11,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w500),
                   maxLines: 1,
@@ -547,7 +520,7 @@ class _WishlistCardState extends State<_WishlistCard> {
                   comic.title.isNotEmpty
                       ? comic.title
                       : 'Issue #${comic.issueNumber ?? "?"}',
-                  style: _ui(13,
+                  style: tUi(13,
                       color: AppColors.textPrimary,
                       weight: FontWeight.w700,
                       height: 1.3),
@@ -595,7 +568,7 @@ class _WishlistCardState extends State<_WishlistCard> {
           border: Border.all(color: AppColors.border),
         ),
         child: Text(label,
-            style: _ui(10,
+            style: tUi(10,
                 color: AppColors.textTertiary,
                 weight: FontWeight.w600)),
       );

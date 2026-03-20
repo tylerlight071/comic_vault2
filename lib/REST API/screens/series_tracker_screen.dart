@@ -4,8 +4,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -16,34 +16,6 @@ import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 import 'series_run_screen.dart';
-
-// ── Typography ────────────────────────────────────────────────────────────────
-
-TextStyle _display(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w700,
-        double? height,
-        double letterSpacing = -0.5}) =>
-    GoogleFonts.playfairDisplay(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -329,7 +301,7 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
                 child: Text('Sort By',
-                    style: _display(18,
+                    style: tDisplay(18,
                         weight: FontWeight.w700, letterSpacing: -0.3)),
               ),
 
@@ -375,7 +347,7 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
                               : AppColors.textSecondary),
                       const SizedBox(width: 14),
                       Text(mode.label,
-                          style: _ui(15,
+                          style: tUi(15,
                               color: active
                                   ? AppColors.textPrimary
                                   : AppColors.textSecondary,
@@ -412,7 +384,7 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
                     ),
                     child: Center(
                       child: Text('Apply',
-                          style: _ui(15,
+                          style: tUi(15,
                               color: AppColors.bg,
                               weight: FontWeight.w700)),
                     ),
@@ -515,7 +487,8 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
                 border: Border.all(color: AppColors.border),
               ),
               child: const Icon(Icons.arrow_back_ios_rounded,
-                  color: AppColors.textSecondary, size: 16),
+                  color: AppColors.textSecondary, size: 16,
+                  semanticLabel: 'Back'),
             ),
           ),
         ),
@@ -524,13 +497,13 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('MY SERIES',
-                style: _ui(10,
+                style: tUi(10,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w700,
                     letterSpacing: 1.6)),
             const SizedBox(height: 2),
             Text('Collection Tracker',
-                style: _display(17,
+                style: tDisplay(17,
                     weight: FontWeight.w700, letterSpacing: -0.4)),
           ],
         ),
@@ -559,12 +532,12 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
                   Expanded(
                     child: TextField(
                       controller: _searchCtrl,
-                      style: _ui(14, weight: FontWeight.w400),
+                      style: tUi(14, weight: FontWeight.w400),
                       cursorColor: AppColors.textSecondary,
                       cursorWidth: 1.5,
                       decoration: InputDecoration(
                         hintText: 'Search series…',
-                        hintStyle: _ui(14,
+                        hintStyle: tUi(14,
                             color: AppColors.textDisabled,
                             weight: FontWeight.w400),
                         border: InputBorder.none,
@@ -707,13 +680,13 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text('No Series Yet',
-                    style: _display(20,
+                    style: tDisplay(20,
                         weight: FontWeight.w700, letterSpacing: -0.3)),
                 const SizedBox(height: 10),
                 Text(
                   'Add comics to your library\nto track series completion.',
                   textAlign: TextAlign.center,
-                  style: _ui(13,
+                  style: tUi(13,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w400,
                       height: 1.55),
@@ -743,13 +716,13 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
               ),
               const SizedBox(height: 24),
               Text('No results',
-                  style: _display(20,
+                  style: tDisplay(20,
                       weight: FontWeight.w700, letterSpacing: -0.3)),
               const SizedBox(height: 10),
               Text(
                 'Try a different series name\nor publisher.',
                 textAlign: TextAlign.center,
-                style: _ui(13,
+                style: tUi(13,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w400,
                     height: 1.55),
@@ -893,7 +866,7 @@ class _SeriesCardState extends State<_SeriesCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(s.seriesName,
-                          style: _ui(14,
+                          style: tUi(14,
                               color: AppColors.textPrimary,
                               weight: FontWeight.w700,
                               height: 1.2),
@@ -902,7 +875,7 @@ class _SeriesCardState extends State<_SeriesCard> {
                       if (s.publisher != null) ...[
                         const SizedBox(height: 3),
                         Text(s.publisher!,
-                            style: _ui(11,
+                            style: tUi(11,
                                 color: AppColors.textTertiary,
                                 weight: FontWeight.w400)),
                       ],
@@ -963,7 +936,7 @@ class _SeriesCardState extends State<_SeriesCard> {
           border: Border.all(color: AppColors.green_(0.25)),
         ),
         child: Text('✓ Done',
-            style: _ui(10,
+            style: tUi(10,
                 color: AppColors.greenOwned,
                 weight: FontWeight.w700)),
       );
@@ -975,13 +948,13 @@ class _SeriesCardState extends State<_SeriesCard> {
         children: [
           Text(
             '${(pct * 100).round()}%',
-            style: _ui(16,
+            style: tUi(16,
                 color: AppColors.textPrimary,
                 weight: FontWeight.w700),
           ),
           Text(
             '${s.ownedCount}/${s.totalIssues}',
-            style: _ui(10,
+            style: tUi(10,
                 color: AppColors.textDisabled,
                 weight: FontWeight.w400),
           ),
@@ -1005,7 +978,7 @@ class _SeriesCardState extends State<_SeriesCard> {
           border: Border.all(color: AppColors.border),
         ),
         child: Text(label,
-            style: _ui(10, color: color, weight: FontWeight.w600)),
+            style: tUi(10, color: color, weight: FontWeight.w600)),
       );
 }
 

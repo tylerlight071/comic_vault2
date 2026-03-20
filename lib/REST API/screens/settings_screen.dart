@@ -2,10 +2,19 @@
 
 // ignore_for_file: deprecated_member_use
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../theme/models/home_layout.dart';
+import '../../theme/models/comic.dart';
+import '../../theme/models/shelf_config.dart';
+import '../../theme/typography.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
 import '../../theme/app_colors.dart';
@@ -13,37 +22,7 @@ import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 
-// ── Typography ────────────────────────────────────────────────────────────────
-
-TextStyle _display(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w700,
-        double? height,
-        double letterSpacing = -0.5}) =>
-    GoogleFonts.playfairDisplay(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
 // ─────────────────────────────────────────────────────────────────────────────
-
-enum HomeLayout { featured, shelves, mosaic }
 
 class SettingsScreen extends StatefulWidget {
   final HomeLayout currentLayout;
@@ -62,15 +41,64 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _refreshing  = false;
-  int  _refreshDone = 0;
-  int  _refreshTotal = 0;
-  late HomeLayout _layout;
+  bool   _refreshing   = false;
+  int    _refreshDone  = 0;
+  int    _refreshTotal = 0;
+  bool   _exporting    = false;
+  bool   _importing    = false;
+  late   HomeLayout _layout;
+  String _appVersion   = '';
+
+  ShelfConfig _shelves = const ShelfConfig();
+
+  final _apiKeyCtrl = TextEditingController();
+  bool  _apiKeyObscured = true;
 
   @override
   void initState() {
     super.initState();
     _layout = widget.currentLayout;
+    _loadVersion();
+    _loadPersistedSettings();
+  }
+
+  @override
+  void dispose() {
+    _apiKeyCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPersistedSettings() async {
+    final prefs   = await SharedPreferences.getInstance();
+    final shelves = await ShelfConfig.load();
+    final apiKey  = prefs.getString('comic_vine_api_key') ?? '';
+    if (mounted) {
+      setState(() {
+        _shelves = shelves;
+        _apiKeyCtrl.text = apiKey;
+      });
+    }
+  }
+
+  Future<void> _saveApiKey(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('comic_vine_api_key', value.trim());
+  }
+
+  Future<void> _toggleShelf(String key, bool value) async {
+    final updated = _shelves.copyWith(
+      showCurrentlyReading: key == 'currently_reading' ? value : null,
+      showRecentlyAdded:    key == 'recently_added'    ? value : null,
+      showContinueReading:  key == 'continue_reading'  ? value : null,
+      showTopRated:         key == 'top_rated'         ? value : null,
+    );
+    setState(() => _shelves = updated);
+    await updated.save();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = '${info.version}+${info.buildNumber}');
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -125,6 +153,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) _snack('Scan history cleared');
   }
 
+  Future<void> _exportData() async {
+    if (_exporting) return;
+    AppHaptics.medium();
+    setState(() => _exporting = true);
+    try {
+      final library  = await DatabaseService.instance.getAllComics();
+      final wishlist = await DatabaseService.instance.getWishlist();
+      final all = [...library, ...wishlist];
+      final payload = const JsonEncoder.withIndent('  ')
+          .convert(all.map((c) => c.toMap()).toList());
+      final dir  = await getTemporaryDirectory();
+      final file = File('${dir.path}/comic_vault_backup.json');
+      await file.writeAsString(payload);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Comic Vault Backup',
+      );
+    } catch (e) {
+      if (mounted) _snack('Export failed: $e');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _importData() async {
+    if (_importing) return;
+    AppHaptics.medium();
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Import from JSON', style: tUi(17, weight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Paste the contents of a Comic Vault backup file below. Existing comics with the same ID will be skipped.',
+              style: tUi(13, color: AppColors.textSecondary, weight: FontWeight.w400, height: 1.55),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              maxLines: 6,
+              style: tUi(12, color: AppColors.textPrimary, weight: FontWeight.w400, height: 1.5),
+              decoration: InputDecoration(
+                hintText: 'Paste JSON here…',
+                hintStyle: tUi(12, color: AppColors.textDisabled),
+                filled: true,
+                fillColor: AppColors.surface2,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: tUi(14, color: AppColors.textSecondary, weight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Import', style: tUi(14, color: AppColors.textPrimary, weight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _importing = true);
+    try {
+      final list = jsonDecode(ctrl.text) as List<dynamic>;
+      int imported = 0;
+      for (final item in list) {
+        try {
+          final map = Map<String, dynamic>.from(item as Map);
+          map.remove('id'); // let DB assign a new id
+          final comic = Comic.fromMap({...map, 'addedDate': map['addedDate'] ?? DateTime.now().toIso8601String()});
+          final exists = await DatabaseService.instance.comicExists(comic.comicVineId);
+          if (!exists) {
+            await DatabaseService.instance.insertComic(comic);
+            imported++;
+          }
+        } catch (_) {}
+      }
+      widget.onDataChanged();
+      if (mounted) _snack('Imported $imported comic${imported == 1 ? '' : 's'}', icon: Icons.check_circle_rounded);
+    } catch (_) {
+      if (mounted) _snack('Invalid JSON — check the file and try again.');
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Future<bool?> _confirmDialog({
@@ -139,9 +270,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: AppColors.bgElevated,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
-          title: Text(title, style: _ui(17, weight: FontWeight.w700)),
+          title: Text(title, style: tUi(17, weight: FontWeight.w700)),
           content: Text(message,
-              style: _ui(14,
+              style: tUi(14,
                   color: AppColors.textSecondary,
                   weight: FontWeight.w400,
                   height: 1.55)),
@@ -149,14 +280,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel',
-                  style: _ui(14,
+                  style: tUi(14,
                       color: AppColors.textSecondary,
                       weight: FontWeight.w600)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(confirmLabel,
-                  style: _ui(14,
+                  style: tUi(14,
                       color: confirmColor, weight: FontWeight.w700)),
             ),
           ],
@@ -170,7 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Icon(icon, color: AppColors.textSecondary, size: 18),
           const SizedBox(width: 10),
         ],
-        Text(msg, style: _ui(13, color: AppColors.textPrimary)),
+        Text(msg, style: tUi(13, color: AppColors.textPrimary)),
       ]),
       backgroundColor: AppColors.snackbar,
       behavior: SnackBarBehavior.floating,
@@ -213,11 +344,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('ComicVault',
-                              style: _display(20,
+                              style: tDisplay(20,
                                   weight: FontWeight.w700,
                                   letterSpacing: -0.4)),
-                          Text('Version 1.9.4',
-                              style: _ui(12,
+                          Text(
+                              _appVersion.isEmpty
+                                  ? '—'
+                                  : 'Version $_appVersion',
+                              style: tUi(12,
                                   color: AppColors.textTertiary,
                                   weight: FontWeight.w400)),
                         ],
@@ -229,6 +363,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _sectionLabel('HOME LAYOUT'),
                   const SizedBox(height: 10),
                   _layoutPicker(),
+
+                  const SizedBox(height: 28),
+
+                  // ── Shelves ──────────────────────────────────────────────
+                  _sectionLabel('HOME SHELVES'),
+                  const SizedBox(height: 10),
+                  _shelvesConfig(),
+
+                  const SizedBox(height: 28),
+
+                  // ── API ──────────────────────────────────────────────────
+                  _sectionLabel('API'),
+                  const SizedBox(height: 10),
+                  _apiKeyTile(),
 
                   const SizedBox(height: 28),
 
@@ -255,6 +403,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     label: 'Clear Scan History',
                     description: 'Remove all past barcode scans.',
                     onTap: _clearBarcodeHistory,
+                    isFirst: false,
+                    isLast: false,
+                  ),
+                  const SizedBox(height: 1),
+                  const SizedBox(height: 1),
+                  _actionTile(
+                    icon: Icons.upload_rounded,
+                    iconBg: AppColors.surface2,
+                    iconColor: AppColors.textSecondary,
+                    label: _exporting ? 'Exporting…' : 'Export Library',
+                    description: 'Save a JSON backup of your full collection.',
+                    onTap: _exportData,
+                    isFirst: false,
+                    isLast: false,
+                  ),
+                  const SizedBox(height: 1),
+                  _actionTile(
+                    icon: Icons.download_rounded,
+                    iconBg: AppColors.surface2,
+                    iconColor: AppColors.textSecondary,
+                    label: _importing ? 'Importing…' : 'Import Library',
+                    description: 'Restore from a JSON backup file.',
+                    onTap: _importData,
                     isFirst: false,
                     isLast: false,
                   ),
@@ -294,6 +465,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ── Shelves config ────────────────────────────────────────────────────────
+
+  Widget _shelvesConfig() {
+    final items = [
+      ('Currently Reading', 'currently_reading', _shelves.showCurrentlyReading),
+      ('Recently Added',    'recently_added',    _shelves.showRecentlyAdded),
+      ('Continue Reading',  'continue_reading',  _shelves.showContinueReading),
+      ('Top Rated',         'top_rated',         _shelves.showTopRated),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: items.asMap().entries.map((e) {
+          final i     = e.key;
+          final label = e.value.$1;
+          final key   = e.value.$2;
+          final value = e.value.$3;
+          final last  = i == items.length - 1;
+          return Container(
+            decoration: BoxDecoration(
+              border: last ? null : Border(
+                bottom: BorderSide(color: AppColors.border.withOpacity(0.4)),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(children: [
+                Expanded(
+                  child: Text(label,
+                      style: tUi(14,
+                          color: AppColors.textPrimary,
+                          weight: FontWeight.w500)),
+                ),
+                Switch(
+                  value: value,
+                  onChanged: (v) {
+                    AppHaptics.select();
+                    _toggleShelf(key, v);
+                  },
+                  activeColor: AppColors.textPrimary,
+                  trackOutlineColor: WidgetStateProperty.all(
+                      AppColors.border),
+                ),
+              ]),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── API key tile ──────────────────────────────────────────────────────────
+
+  Widget _apiKeyTile() => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Comic Vine API Key',
+                style: tUi(14,
+                    color: AppColors.textPrimary,
+                    weight: FontWeight.w600)),
+            const SizedBox(height: 3),
+            Text(
+              'Optionally use your own key from comicvine.gamespot.com. '
+              'Leave blank to use the built-in key.',
+              style: tUi(12,
+                  color: AppColors.textTertiary,
+                  weight: FontWeight.w400,
+                  height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(children: [
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _apiKeyCtrl,
+                    obscureText: _apiKeyObscured,
+                    onChanged: _saveApiKey,
+                    style: tUi(13,
+                        color: AppColors.textPrimary,
+                        weight: FontWeight.w400),
+                    decoration: InputDecoration(
+                      hintText: 'Paste API key here…',
+                      hintStyle: tUi(13,
+                          color: AppColors.textDisabled,
+                          weight: FontWeight.w400),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                Pressable(
+                  onTap: () => setState(
+                      () => _apiKeyObscured = !_apiKeyObscured),
+                  haptic: HapticStyle.light,
+                  scaleDown: 0.88,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    child: Icon(
+                      _apiKeyObscured
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                      color: AppColors.textTertiary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            if (_apiKeyCtrl.text.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Pressable(
+                onTap: () async {
+                  _apiKeyCtrl.clear();
+                  await _saveApiKey('');
+                  setState(() {});
+                  if (mounted) _snack('API key cleared');
+                },
+                haptic: HapticStyle.light,
+                scaleDown: 0.95,
+                child: Text('Clear custom key',
+                    style: tUi(12,
+                        color: AppColors.textTertiary,
+                        weight: FontWeight.w500)),
+              ),
+            ],
+          ],
+        ),
+      );
+
   // ── App bar ───────────────────────────────────────────────────────────────
 
   Widget _buildAppBar() => SliverAppBar(
@@ -321,7 +639,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 border: Border.all(color: AppColors.border),
               ),
               child: const Icon(Icons.arrow_back_ios_rounded,
-                  color: AppColors.textSecondary, size: 16),
+                  color: AppColors.textSecondary, size: 16,
+                  semanticLabel: 'Back'),
             ),
           ),
         ),
@@ -330,13 +649,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('PREFERENCES',
-                style: _ui(10,
+                style: tUi(10,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w700,
                     letterSpacing: 1.6)),
             const SizedBox(height: 2),
             Text('Settings',
-                style: _display(17,
+                style: tDisplay(17,
                     weight: FontWeight.w700, letterSpacing: -0.4)),
           ],
         ),
@@ -347,7 +666,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(left: 2),
         child: Text(text,
-            style: _ui(10,
+            style: tUi(10,
                 color: AppColors.textTertiary,
                 weight: FontWeight.w700,
                 letterSpacing: 1.6)),
@@ -366,12 +685,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Home screen style',
-                style: _ui(14,
+                style: tUi(14,
                     color: AppColors.textPrimary,
                     weight: FontWeight.w600)),
             const SizedBox(height: 3),
             Text('Choose how your collection is displayed on launch.',
-                style: _ui(12,
+                style: tUi(12,
                     color: AppColors.textTertiary,
                     weight: FontWeight.w400,
                     height: 1.4)),
@@ -432,7 +751,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 size: 20),
             const SizedBox(height: 6),
             Text(label,
-                style: _ui(12,
+                style: tUi(12,
                     color: selected
                         ? AppColors.bg
                         : AppColors.textPrimary,
@@ -440,7 +759,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 2),
             Text(sub,
                 textAlign: TextAlign.center,
-                style: _ui(9,
+                style: tUi(9,
                     color: selected
                         ? AppColors.bg.withOpacity(0.55)
                         : AppColors.textDisabled,
@@ -486,12 +805,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Refresh Vault Data',
-                          style: _ui(14,
+                          style: tUi(14,
                               color: AppColors.textPrimary,
                               weight: FontWeight.w600)),
                       const SizedBox(height: 2),
                       Text('Re-fetch metadata for all comics.',
-                          style: _ui(12,
+                          style: tUi(12,
                               color: AppColors.textTertiary,
                               weight: FontWeight.w400,
                               height: 1.4)),
@@ -521,7 +840,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _refreshTotal > 0
                       ? 'Updating $_refreshDone of $_refreshTotal comics…'
                       : 'Starting refresh…',
-                  style: _ui(12,
+                  style: tUi(12,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w400),
                 ),
@@ -580,12 +899,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: _ui(14,
+                    style: tUi(14,
                         color: labelColor ?? AppColors.textPrimary,
                         weight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(description,
-                    style: _ui(12,
+                    style: tUi(12,
                         color: AppColors.textTertiary,
                         weight: FontWeight.w400,
                         height: 1.4)),
@@ -625,12 +944,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: Row(children: [
               Text(row.label,
-                  style: _ui(13,
+                  style: tUi(13,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w500)),
               const Spacer(),
               Text(row.value,
-                  style: _ui(13,
+                  style: tUi(13,
                       color: AppColors.textSecondary,
                       weight: FontWeight.w500)),
             ]),
