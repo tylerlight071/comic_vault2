@@ -41,7 +41,11 @@ class _ComicCardState extends State<ComicCard> {
   @override
   void initState() {
     super.initState();
-    _loadPalette();
+    // Defer palette extraction to after the first frame so it doesn't compete
+    // with the image decode on the raster thread during grid population.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadPalette();
+    });
   }
 
   @override

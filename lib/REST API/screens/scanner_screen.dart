@@ -60,21 +60,22 @@ class _ScannerScreenState extends State<ScannerScreen>
   }
 
   String? _validateAndNormalizeBarcode(String raw) {
-    final clean = raw.replaceAll(RegExp(r'[^\d]'), '');
-    if (clean.length < 8 || clean.length > 13) return null;
-    
-    // Basic checksum validation for UPC/EAN
-    if (!_isValidBarcodeChecksum(clean)) return null;
-    
-    return clean;
-  }
+    var clean = raw.replaceAll(RegExp(r'[^\d]'), '');
 
-  bool _isValidBarcodeChecksum(String code) {
-    if (code.length < 8) return false;
-    
-    // Simple length check for now - could implement full UPC/EAN checksum
-    final length = code.length;
-    return length == 8 || length == 12 || length == 13;
+    // Comic barcodes are UPC-A (12) or EAN-13 (13). Scanners sometimes
+    // return the main barcode concatenated with a 2 or 5-digit supplement
+    // (issue/edition info), producing 14, 15, 17, or 18 digits. Strip the
+    // supplement so we're left with the standard 12 or 13-digit barcode.
+    if (clean.length == 14 || clean.length == 17) {
+      clean = clean.substring(0, 12); // UPC-A + supplement
+    } else if (clean.length == 15 || clean.length == 18) {
+      clean = clean.substring(0, 13); // EAN-13 + supplement
+    }
+
+    if (clean.length != 8 && clean.length != 12 && clean.length != 13) {
+      return null;
+    }
+    return clean;
   }
 
   void _selectFromHistory(String barcode) {

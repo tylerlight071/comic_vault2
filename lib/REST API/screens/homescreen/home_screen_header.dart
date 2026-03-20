@@ -134,7 +134,7 @@ class _MosaicFloatingHeader extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(13),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                   child: Container(
                     height: 44,
                     decoration: BoxDecoration(
@@ -165,7 +165,7 @@ class _MosaicFloatingHeader extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(13),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                 child: Container(
                   width: 44,
                   height: 44,

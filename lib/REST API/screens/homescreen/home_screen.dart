@@ -53,6 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   HomeLayout _layout = HomeLayout.featured;
 
+  // Cached shelf lists — computed once after each load, not on every build().
+  List<Comic> _recentlyAdded  = [];
+  List<Comic> _continueReading = [];
+  List<Comic> _topRated        = [];
+  Comic?      _featuredComic;
+
   // How many comics to show in the Recently Added shelf. Enough to give a
   // meaningful snapshot without the row feeling endless.
   static const int _recentlyAddedLimit = 6;
@@ -83,6 +89,20 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _all = comics;
         _loading = false;
+        _updateShelves(comics);
+      });
+      _warmPalette(comics);
+    }
+  }
+
+  /// Refreshes data without showing the loading skeleton — used after edits or
+  /// returning from sub-screens so the home screen stays visible while updating.
+  Future<void> _silentRefresh() async {
+    final comics = await DatabaseService.instance.getAllComics();
+    if (mounted) {
+      setState(() {
+        _all = comics;
+        _updateShelves(comics);
       });
       _warmPalette(comics);
     }
@@ -106,29 +126,40 @@ void _warmPalette(List<Comic> comics) {
   }
 }
 
-  // ── Shelf data ────────────────────────────────────────────────────────────
+  // ── Shelf data helpers ────────────────────────────────────────────────────
+  //
+  // These compute methods are called once inside _load()/_silentRefresh() and
+  // their results stored in fields. Getters that ran on every build() caused
+  // O(n log n) sorts to repeat for every setState (layout toggle, scroll, etc).
 
-  /// Capped at [_recentlyAddedLimit] — the shelf is a curated snapshot,
-  /// not a full chronological dump. Users wanting everything go to Library.
-  List<Comic> get _recentlyAdded {
-    final sorted = List.of(_all)
+  List<Comic> _computeRecentlyAdded(List<Comic> comics) {
+    final sorted = List.of(comics)
       ..sort((a, b) => b.addedDate.compareTo(a.addedDate));
     return sorted.take(_recentlyAddedLimit).toList();
   }
 
-  List<Comic> get _continueReading => (_all.where((c) => !c.isRead).toList()
-    ..sort((a, b) => b.addedDate.compareTo(a.addedDate)));
+  List<Comic> _computeContinueReading(List<Comic> comics) =>
+      (comics.where((c) => !c.isRead).toList()
+        ..sort((a, b) => b.addedDate.compareTo(a.addedDate)));
 
-  List<Comic> get _topRated => (_all.where((c) => c.starRating > 0).toList()
-    ..sort((a, b) => b.starRating.compareTo(a.starRating)));
+  List<Comic> _computeTopRated(List<Comic> comics) =>
+      (comics.where((c) => c.starRating > 0).toList()
+        ..sort((a, b) => b.starRating.compareTo(a.starRating)));
 
-  Comic? get _featuredComic {
-    if (_all.isEmpty) return null;
-    final candidates = _all.where((c) => c.coverImageUrl != null).toList();
-    final pool = candidates.isNotEmpty ? candidates : _all;
+  Comic? _computeFeaturedComic(List<Comic> comics) {
+    if (comics.isEmpty) return null;
+    final candidates = comics.where((c) => c.coverImageUrl != null).toList();
+    final pool = candidates.isNotEmpty ? candidates : comics;
     final now = DateTime.now();
     final seed = now.year * 10000 + now.month * 100 + now.day;
     return pool[Random(seed).nextInt(pool.length)];
+  }
+
+  void _updateShelves(List<Comic> comics) {
+    _recentlyAdded   = _computeRecentlyAdded(comics);
+    _continueReading = _computeContinueReading(comics);
+    _topRated        = _computeTopRated(comics);
+    _featuredComic   = _computeFeaturedComic(comics);
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -147,7 +178,7 @@ void _warmPalette(List<Comic> comics) {
         context,
         MaterialPageRoute(
             builder: (_) => SearchResultsScreen(
-                initialQuery: barcode, onComicAdded: _load)));
+                initialQuery: barcode, onComicAdded: _silentRefresh)));
   }
 
   void _openSearch() {
@@ -156,7 +187,7 @@ void _warmPalette(List<Comic> comics) {
         context,
         MaterialPageRoute(
             builder: (_) =>
-                SearchResultsScreen(initialQuery: '', onComicAdded: _load)));
+                SearchResultsScreen(initialQuery: '', onComicAdded: _silentRefresh)));
   }
 
   void _openComic(Comic comic) {
@@ -165,7 +196,7 @@ void _warmPalette(List<Comic> comics) {
         context,
         PageRouteBuilder(
           pageBuilder: (_, __, ___) =>
-              ComicDetailScreen(comic: comic, onUpdated: _load),
+              ComicDetailScreen(comic: comic, onUpdated: _silentRefresh),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 300),
@@ -186,7 +217,7 @@ void _warmPalette(List<Comic> comics) {
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 280),
-            )).then((_) => _load());
+            )).then((_) => _silentRefresh());
       });
 
   void _openLibrary() => _drawerNav(() {
@@ -198,7 +229,7 @@ void _warmPalette(List<Comic> comics) {
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 280),
-            )).then((_) => _load());
+            )).then((_) => _silentRefresh());
       });
 
   void _openSeriesTracker() => _drawerNav(() {

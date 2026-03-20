@@ -199,7 +199,7 @@ class ComicVineService {
     return body['number_of_total_results'] as int? ?? 0;
   }
 
-  static const int _fetchMultiplier = 3;
+  static const int _fetchMultiplier = 2;
 
   Future<SearchResult> search(
     String query, {
@@ -286,7 +286,17 @@ class ComicVineService {
     }
   }
 
+  // In-memory cache for volume issue lists — avoids redundant API calls when
+  // the user navigates in/out of the same series repeatedly.
+  final Map<String, (List<Comic>, DateTime)> _volumeIssuesCache = {};
+  static const Duration _volumeCacheTtl = Duration(minutes: 15);
+
   Future<List<Comic>> getVolumeIssues(String volumeId) async {
+    final cached = _volumeIssuesCache[volumeId];
+    if (cached != null && DateTime.now().difference(cached.$2) < _volumeCacheTtl) {
+      return cached.$1;
+    }
+
     final key       = await _apiKey();
     final allIssues = <Comic>[];
     int offset      = 0;
@@ -310,6 +320,8 @@ class ComicVineService {
       offset += limit;
       if (offset >= total || results.isEmpty) break;
     }
+
+    _volumeIssuesCache[volumeId] = (allIssues, DateTime.now());
     return allIssues;
   }
 

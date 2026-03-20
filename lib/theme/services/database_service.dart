@@ -10,12 +10,13 @@ class DatabaseService {
   DatabaseService._();
 
   Database? _db;
+  bool _ftsAvailable = false;
 
   Future<void> init() async {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       join(dbPath, 'comic_vault.db'),
-      version: 4,
+      version: 6,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE comics (
@@ -65,6 +66,8 @@ class DatabaseService {
             isFavorite  INTEGER NOT NULL DEFAULT 0
           )
         ''');
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_search_history_ts ON search_history(timestamp DESC)');
 
         await db.execute('''
           CREATE TABLE barcode_history (
@@ -74,6 +77,11 @@ class DatabaseService {
             comicVineId TEXT
           )
         ''');
+      },
+      onOpen: (db) async {
+        final rows = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='comics_fts'");
+        _ftsAvailable = rows.isNotEmpty;
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -116,6 +124,8 @@ class DatabaseService {
                 isFavorite  INTEGER NOT NULL DEFAULT 0
               )
             ''');
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_search_history_ts ON search_history(timestamp DESC)');
           } catch (_) {}
 
           try {
@@ -132,6 +142,42 @@ class DatabaseService {
         if (oldVersion < 4) {
           // Add indexes to existing databases upgrading from v1–v3
           await _createIndexes(db);
+        }
+        if (oldVersion < 5) {
+          // Add barcode + composite series indexes, and search_history timestamp index
+          await _createIndexes(db);
+          try {
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_search_history_ts ON search_history(timestamp DESC)');
+          } catch (_) {}
+        }
+        if (oldVersion < 6) {
+          // Create FTS table if it was missed by earlier migrations, then populate it
+          try {
+            await db.execute('''
+              CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts USING fts4(
+                title, seriesName, issueNumber, publisher, description,
+                writers, artists, barcode,
+                content='comics',
+                content_rowid='id'
+              )
+            ''');
+            // Populate from existing comics
+            final comics = await db.query('comics');
+            for (final comic in comics) {
+              await db.insert('comics_fts', {
+                'rowid': comic['id'],
+                'title': comic['title'] ?? '',
+                'seriesName': comic['seriesName'] ?? '',
+                'issueNumber': comic['issueNumber'] ?? '',
+                'publisher': comic['publisher'] ?? '',
+                'description': comic['description'] ?? '',
+                'writers': comic['writers'] ?? '',
+                'artists': comic['artists'] ?? '',
+                'barcode': comic['barcode'] ?? '',
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+          } catch (_) {}
         }
       },
     );
@@ -156,6 +202,12 @@ class DatabaseService {
     // Composite for the most common combined filter
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_comics_wishlisted_added ON comics(isWishlisted, addedDate DESC)');
+    // barcode — scanned on every barcode lookup, previously unindexed
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_comics_barcode ON comics(barcode)');
+    // Composite series+issue for grouped list view sorting
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_comics_series_issue ON comics(seriesName, issueNumber)');
   }
 
   Database get _database {
@@ -347,6 +399,7 @@ class DatabaseService {
     List<Map<String, dynamic>> rows;
 
     try {
+      if (!_ftsAvailable) throw Exception('FTS unavailable');
       final ftsQuery = trimmedQuery.split(' ').map((word) => '"$word"*').join(' OR ');
       final ftsRows = await _database.rawQuery('''
         SELECT rowid, rank

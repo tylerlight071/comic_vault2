@@ -204,9 +204,9 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
                     boxShadow: [
                       BoxShadow(
                         color: _paletteColor.withOpacity(0.6),
-                        blurRadius: 36,
-                        spreadRadius: 4,
-                        offset: const Offset(0, 14),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 10),
                       ),
                       BoxShadow(
                         color: Colors.black.withOpacity(0.55),

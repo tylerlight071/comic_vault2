@@ -126,9 +126,14 @@ class _SeriesRunScreenState extends State<SeriesRunScreen>
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final issues     = await ComicVineService.instance.getVolumeIssues(widget.volumeId);
-      final owned      = await DatabaseService.instance.getOwnedIds();
-      final wishlisted = await DatabaseService.instance.getWishlistIds();
+      // Start all three fetches concurrently — API call and two DB reads are
+      // independent so there is no reason to await them sequentially.
+      final issuesFuture     = ComicVineService.instance.getVolumeIssues(widget.volumeId);
+      final ownedFuture      = DatabaseService.instance.getOwnedIds();
+      final wishlistedFuture = DatabaseService.instance.getWishlistIds();
+      final issues     = await issuesFuture;
+      final owned      = await ownedFuture;
+      final wishlisted = await wishlistedFuture;
       if (mounted) {
         setState(() {
           _issues      = issues;

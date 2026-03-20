@@ -94,7 +94,8 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen> {
+class _LibraryScreenState extends State<LibraryScreen>
+    with SingleTickerProviderStateMixin {
   List<Comic> _all = [];
   bool _loading = true;
 
@@ -105,6 +106,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
 
+  // Shimmer — single controller shared across all skeleton cards so only one
+  // animation drives the repaint instead of N independent ones.
+  late final AnimationController _shimmerCtrl;
+
+  // Memoised derived lists — recomputed only when _all, _query, _sort or
+  // _filter actually change, not on every build() call.
+  List<Comic>? _cachedFiltered;
+  Map<String, List<Comic>>? _cachedGrouped;
+
+  void _invalidateCache() {
+    _cachedFiltered = null;
+    _cachedGrouped  = null;
+  }
+
   // Returns true when anything deviates from the defaults
   bool get _hasActiveFilters =>
       _sort != _SortMode.dateAdded || _filter != _FilterMode.all;
@@ -112,9 +127,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    _shimmerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
     _searchCtrl.addListener(() {
       if (_searchCtrl.text != _query) {
-        setState(() => _query = _searchCtrl.text);
+        setState(() { _query = _searchCtrl.text; _invalidateCache(); });
       }
     });
     _load();
@@ -122,6 +141,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   void dispose() {
+    _shimmerCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -129,12 +149,29 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final comics = await DatabaseService.instance.getAllComics();
-    if (mounted) setState(() { _all = comics; _loading = false; });
+    if (mounted) setState(() { _all = comics; _loading = false; _invalidateCache(); });
   }
 
-  // ── Derived list ──────────────────────────────────────────────────────────
+  /// Refreshes the data without flipping the loading skeleton, so the UI
+  /// stays visible while the list updates after an edit.
+  Future<void> _silentRefresh() async {
+    final comics = await DatabaseService.instance.getAllComics();
+    if (mounted) setState(() { _all = comics; _invalidateCache(); });
+  }
+
+  // ── Derived lists (memoised) ──────────────────────────────────────────────
+  //
+  // Both getters write through to a cache that is invalidated by
+  // _invalidateCache() whenever _all, _query, _sort, or _filter changes.
+  // This means the O(n log n) sort and O(n²) grouping only run once per
+  // actual state change, not on every build() call.
 
   List<Comic> get _filtered {
+    _cachedFiltered ??= _computeFiltered();
+    return _cachedFiltered!;
+  }
+
+  List<Comic> _computeFiltered() {
     var list = List.of(_all);
 
     if (_filter == _FilterMode.read)   list = list.where((c) => c.isRead).toList();
@@ -177,8 +214,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Map<String, List<Comic>> get _groupedBySeries {
+    _cachedGrouped ??= _computeGroupedBySeries();
+    return _cachedGrouped!;
+  }
+
+  Map<String, List<Comic>> _computeGroupedBySeries() {
+    // Reuse the already-cached filtered list so we don't redo the sort.
+    final filtered = _filtered;
     final map = <String, List<Comic>>{};
-    for (final comic in _filtered) {
+    for (final comic in filtered) {
       map.putIfAbsent(comic.seriesName, () => []).add(comic);
     }
     for (final list in map.values) {
@@ -209,7 +253,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     AppHaptics.light();
     Navigator.push(context, PageRouteBuilder(
       pageBuilder: (_, __, ___) => ComicDetailScreen(
-          comic: comic, onUpdated: _load, mode: ComicDetailMode.owned),
+          comic: comic, onUpdated: _silentRefresh, mode: ComicDetailMode.owned),
       transitionsBuilder: (_, anim, __, child) =>
           FadeTransition(opacity: anim, child: child),
       transitionDuration: const Duration(milliseconds: 260),
@@ -451,6 +495,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       setState(() {
                         _sort   = tempSort;
                         _filter = tempFilter;
+                        _invalidateCache();
                       });
                       Navigator.pop(ctx);
                     },
@@ -750,6 +795,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       setState(() {
                         _sort   = _SortMode.dateAdded;
                         _filter = _FilterMode.all;
+                        _invalidateCache();
                       });
                     },
                     haptic: HapticStyle.none,
@@ -780,6 +826,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
       delegate: SliverChildBuilderDelegate(
         (ctx, i) => ComicCard(
+          key: ValueKey(comics[i].comicVineId),
           comic: comics[i],
           onTap: () => _openDetail(comics[i]),
         )
@@ -835,13 +882,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
         mainAxisSpacing: 16,
       ),
       delegate: SliverChildBuilderDelegate(
-        (_, i) => const SkeletonBox.cover()
-            .animate(
-              delay: Duration(milliseconds: i * 40),
-              onPlay: (c) => c.repeat(),
-            )
+        // All skeletons share one AnimationController so only a single
+        // animation drives repaints instead of 9 independent timers.
+        (_, __) => const SkeletonBox.cover()
+            .animate(controller: _shimmerCtrl)
             .shimmer(
-              duration: 1400.ms,
               color: AppColors.skeletonHighlight.withOpacity(0.3),
             ),
         childCount: 9,
