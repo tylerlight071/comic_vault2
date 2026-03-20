@@ -58,6 +58,36 @@ class _StatsScreenState extends State<StatsScreen> {
     return rated.map((c) => c.starRating).reduce((a, b) => a + b) / rated.length;
   }
 
+  // ── This-year stats (requires readDate to be populated) ───────────────────
+
+  int get _thisYear => DateTime.now().year;
+
+  List<Comic> get _readThisYear => _library
+      .where((c) => c.readDate != null && c.readDate!.year == _thisYear)
+      .toList();
+
+  /// Reads per month (Jan=1 … Dec=12) for the current year.
+  List<MapEntry<String, int>> get _readByMonth {
+    final months = <int, int>{};
+    for (final c in _readThisYear) {
+      months[c.readDate!.month] = (months[c.readDate!.month] ?? 0) + 1;
+    }
+    const labels = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return months.entries
+        .map((e) => MapEntry(labels[e.key], e.value))
+        .toList()
+      ..sort((a, b) {
+        final ai = labels.indexOf(a.key);
+        final bi = labels.indexOf(b.key);
+        return ai.compareTo(bi);
+      });
+  }
+
+  // ── Series / publisher / etc. ──────────────────────────────────────────────
+
   int get _seriesCount => _library.map((c) => c.seriesName).toSet().length;
   int get _publisherCount =>
       _library.where((c) => c.publisher != null).map((c) => c.publisher!).toSet().length;
@@ -146,6 +176,10 @@ class _StatsScreenState extends State<StatsScreen> {
                     _buildSummaryGrid(),
                     const SizedBox(height: 28),
                     _buildReadingProgress(),
+                    if (_readThisYear.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _buildThisYear(),
+                    ],
                     const SizedBox(height: 28),
                     if (_topSeries.isNotEmpty) ...[
                       _sectionLabel('TOP SERIES'),
@@ -325,6 +359,110 @@ class _StatsScreenState extends State<StatsScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  // ── This year ─────────────────────────────────────────────────────────────
+
+  Widget _buildThisYear() {
+    final count   = _readThisYear.length;
+    final byMonth = _readByMonth;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('$count',
+                  style: tDisplay(32,
+                      weight: FontWeight.w700, letterSpacing: -1.0)),
+              const SizedBox(width: 8),
+              Text('read in $_thisYear',
+                  style: tUi(14,
+                      color: AppColors.textTertiary,
+                      weight: FontWeight.w400)),
+            ],
+          ),
+          if (byMonth.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _sectionLabel('BY MONTH'),
+            const SizedBox(height: 10),
+            _buildInlineBarChart(byMonth, barColor: AppColors.accent),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Compact bar chart rendered inline (no outer container — caller wraps it).
+  Widget _buildInlineBarChart(List<MapEntry<String, int>> entries,
+      {Color barColor = AppColors.textPrimary}) {
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final max = entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    return Column(
+      children: entries.asMap().entries.map((entry) {
+        final i     = entry.key;
+        final label = entry.value.key;
+        final count = entry.value.value;
+        final frac  = max == 0 ? 0.0 : count / max;
+        final isLast = i == entries.length - 1;
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+          child: Row(children: [
+            SizedBox(
+              width: 36,
+              child: Text(label,
+                  style: tUi(12,
+                      color: AppColors.textSecondary,
+                      weight: FontWeight.w500)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: Stack(children: [
+                  Container(height: 6, color: AppColors.surface3),
+                  FractionallySizedBox(
+                    widthFactor: frac,
+                    child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: barColor,
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: barColor.withOpacity(0.4),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 20,
+              child: Text('$count',
+                  textAlign: TextAlign.end,
+                  style: tUi(12,
+                      color: AppColors.textTertiary,
+                      weight: FontWeight.w600)),
+            ),
+          ]),
+        );
+      }).toList(),
     );
   }
 

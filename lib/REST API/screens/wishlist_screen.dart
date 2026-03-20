@@ -59,8 +59,13 @@ class _WishlistScreenState extends State<WishlistScreen> {
 
   Future<void> _remove(Comic comic) async {
     AppHaptics.medium();
-    await DatabaseService.instance.removeFromWishlist(comic.comicVineId);
-    await _load();
+
+    // Optimistic remove — update UI instantly without a loading flash.
+    setState(() => _items.removeWhere((c) => c.comicVineId == comic.comicVineId));
+
+    // Persist in the background.
+    DatabaseService.instance.removeFromWishlist(comic.comicVineId);
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Removed from wishlist',
@@ -75,7 +80,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
           textColor: AppColors.textSecondary,
           onPressed: () async {
             await DatabaseService.instance.addToWishlist(comic);
-            _load();
+            if (mounted) setState(() => _items.insert(0, comic));
           },
         ),
       ));

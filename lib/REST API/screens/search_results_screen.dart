@@ -688,7 +688,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   static const String _reportWebhookUrl =
-      'https://discord.com/api/webhooks/1484505399796301854/nDqqB2-mpQ3PEi6CdsOvztDsMUpRUNBHTFsXO7jaUtlqWmgiNZjmper1UctNV0-PfG27';
+      String.fromEnvironment('DISCORD_WEBHOOK_URL', defaultValue: '');
 
   void _sendNewBarcodeMappingLog(String barcode, Comic comic) async {
     final label =

@@ -139,7 +139,10 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
 
   Future<void> _toggleRead() async {
     AppHaptics.medium();
-    final u = _comic.copyWith(isRead: !_comic.isRead);
+    final nowRead = !_comic.isRead;
+    final u = nowRead
+        ? _comic.copyWith(isRead: true, isReading: false, readDate: DateTime.now())
+        : _comic.copyWith(isRead: false, clearReadDate: true);
     await DatabaseService.instance.updateComic(u);
     setState(() => _comic = u);
     widget.onUpdated();
@@ -147,7 +150,11 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
 
   Future<void> _toggleIsReading() async {
     AppHaptics.medium();
-    final u = _comic.copyWith(isReading: !_comic.isReading);
+    final nowReading = !_comic.isReading;
+    // Marking as reading clears the read state to avoid both being true.
+    final u = nowReading
+        ? _comic.copyWith(isReading: true, isRead: false, clearReadDate: true)
+        : _comic.copyWith(isReading: false);
     await DatabaseService.instance.updateComic(u);
     setState(() => _comic = u);
     widget.onUpdated();
@@ -1019,7 +1026,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   static const String _reportWebhookUrl =
-      'https://discord.com/api/webhooks/1484505399796301854/nDqqB2-mpQ3PEi6CdsOvztDsMUpRUNBHTFsXO7jaUtlqWmgiNZjmper1UctNV0-PfG27';
+      String.fromEnvironment('DISCORD_WEBHOOK_URL', defaultValue: '');
 
   Future<Map<String, dynamic>> _saveReport(String note) async {
     final timestamp = DateTime.now().toIso8601String();

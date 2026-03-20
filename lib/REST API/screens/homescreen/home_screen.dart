@@ -145,7 +145,7 @@ void _warmPalette(List<Comic> comics) {
       .toList();
  
   for (var i = 0; i < urls.length; i++) {
-    Future.delayed(Duration(milliseconds: i * 60), () {
+    Future.delayed(Duration(milliseconds: i * 20), () {
       if (mounted) CoverPaletteService.instance.getColor(urls[i]);
     });
   }
@@ -211,13 +211,6 @@ void _warmPalette(List<Comic> comics) {
         context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
     if (!mounted || barcode == null) return;
 
-    // Show a loading indicator while we resolve the barcode
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
     // Strip supplement for fallback search query (just the main UPC)
     final mainBarcode = barcode.length == 17
         ? barcode.substring(0, 12)
@@ -225,9 +218,66 @@ void _warmPalette(List<Comic> comics) {
             ? barcode.substring(0, 13)
             : barcode;
 
+    // Show a styled loading dialog while we resolve the barcode.
+    // A cancel button lets the user abort; a 15-second timeout auto-dismisses.
+    bool cancelled = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            width: 280,
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    color: AppColors.accent,
+                    strokeWidth: 2.5,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text('Looking up barcode…',
+                    style: tUi(15,
+                        color: AppColors.textPrimary,
+                        weight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Text(mainBarcode,
+                    style: tUi(12, color: AppColors.textTertiary)),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () {
+                    cancelled = true;
+                    Navigator.pop(dialogCtx);
+                  },
+                  child: Text('Cancel',
+                      style: tUi(14,
+                          color: AppColors.accent,
+                          weight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
-      final comic = await ComicVineService.instance.lookupByBarcode(barcode);
+      final comic = await ComicVineService.instance
+          .lookupByBarcode(barcode)
+          .timeout(const Duration(seconds: 15));
       if (!mounted) return;
+      if (cancelled) return;
       Navigator.pop(context); // dismiss loader
 
       if (comic != null) {
@@ -270,7 +320,8 @@ void _warmPalette(List<Comic> comics) {
       }
     } catch (_) {
       if (!mounted) return;
-      Navigator.pop(context);
+      if (cancelled) return;
+      Navigator.pop(context); // dismiss loader
       await Navigator.push(
         context,
         MaterialPageRoute(

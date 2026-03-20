@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../theme/typography.dart';
 
 import '../../../widgets/pressable.dart';
 import '../../theme/services/database_service.dart';
@@ -184,10 +184,9 @@ class _ScannerScreenState extends State<ScannerScreen>
             const Spacer(),
             Text(
               'SCAN BARCODE',
-              style: GoogleFonts.inter(
+              style: tUi(13,
                 color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                weight: FontWeight.w600,
                 letterSpacing: 2,
               ),
             ),
@@ -253,10 +252,9 @@ class _ScannerScreenState extends State<ScannerScreen>
                 children: [
                   Text(
                     'Recent Scans',
-                    style: GoogleFonts.inter(
+                    style: tUi(16,
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      weight: FontWeight.w600,
                     ),
                   ),
                   const Spacer(),
@@ -277,10 +275,7 @@ class _ScannerScreenState extends State<ScannerScreen>
                   ? Center(
                       child: Text(
                         'No recent scans',
-                        style: GoogleFonts.inter(
-                          color: Colors.white54,
-                          fontSize: 14,
-                        ),
+                        style: tUi(14, color: Colors.white54),
                       ),
                     )
                   : ListView.builder(
@@ -315,18 +310,11 @@ class _ScannerScreenState extends State<ScannerScreen>
                                     children: [
                                       Text(
                                         barcode,
-                                        style: GoogleFonts.inter(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: tUi(14, color: Colors.white, weight: FontWeight.w500),
                                       ),
                                       Text(
                                         timeAgo,
-                                        style: GoogleFonts.inter(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
+                                        style: tUi(12, color: Colors.white54),
                                       ),
                                     ],
                                   ),
@@ -385,11 +373,7 @@ class _ScannerScreenState extends State<ScannerScreen>
           child: Text(
             'Point at the barcode on the back\nof your comic book',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              color: Colors.white54,
-              fontSize: 14,
-              height: 1.5,
-            ),
+            style: tUi(14, color: Colors.white54, height: 1.5),
           ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
         ),
       ),

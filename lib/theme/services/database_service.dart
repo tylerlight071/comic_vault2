@@ -372,33 +372,58 @@ class DatabaseService {
     void Function(int done, int total)? onProgress,
   }) async {
     final rows = await _database.query('comics',
-        columns: ['id', 'comicVineId', 'isRead', 'starRating', 'barcode', 'addedDate', 'isWishlisted']);
+        columns: ['id', 'comicVineId', 'barcode']);
     final total = rows.length;
 
-    for (var i = 0; i < rows.length; i++) {
-      final row = rows[i];
-      final comicVineId = row['comicVineId'] as String;
-      try {
-        await Future.delayed(const Duration(milliseconds: 300));
-        final fresh = await ComicVineService.instance.fetchIssueById(comicVineId);
-        if (fresh != null) {
-          await _database.update('comics', {
-            'volumeId':        fresh.volumeId,
-            'title':           fresh.title,
-            'seriesName':      fresh.seriesName,
-            'issueNumber':     fresh.issueNumber,
-            'publicationYear': fresh.publicationYear,
-            'publisher':       fresh.publisher,
-            'description':     fresh.description,
-            'coverImageUrl':   fresh.coverImageUrl,
-            'writers':         fresh.writers,
-            'artists':         fresh.artists,
-          },
-          where: 'comicVineId = ?',
-          whereArgs: [comicVineId]);
-        }
-      } catch (_) {}
-      onProgress?.call(i + 1, total);
+    // Process up to 3 comics concurrently to keep total refresh time reasonable
+    // while staying within Comic Vine API rate limits.
+    const batchSize = 3;
+    var done = 0;
+
+    for (var start = 0; start < rows.length; start += batchSize) {
+      final batch = rows.sublist(start,
+          (start + batchSize).clamp(0, rows.length));
+
+      await Future.wait(batch.map((row) async {
+        final rowId       = row['id'] as int;
+        final comicVineId = row['comicVineId'] as String;
+        try {
+          final fresh = await ComicVineService.instance.fetchIssueById(comicVineId);
+          if (fresh != null) {
+            await _database.transaction((txn) async {
+              await txn.update('comics', {
+                'volumeId':        fresh.volumeId,
+                'title':           fresh.title,
+                'seriesName':      fresh.seriesName,
+                'issueNumber':     fresh.issueNumber,
+                'publicationYear': fresh.publicationYear,
+                'publisher':       fresh.publisher,
+                'description':     fresh.description,
+                'coverImageUrl':   fresh.coverImageUrl,
+                'writers':         fresh.writers,
+                'artists':         fresh.artists,
+              }, where: 'comicVineId = ?', whereArgs: [comicVineId]);
+              await txn.insert('comics_fts', {
+                'rowid':       rowId,
+                'title':       fresh.title,
+                'seriesName':  fresh.seriesName,
+                'issueNumber': fresh.issueNumber ?? '',
+                'publisher':   fresh.publisher ?? '',
+                'description': fresh.description ?? '',
+                'writers':     fresh.writers ?? '',
+                'artists':     fresh.artists ?? '',
+                'barcode':     row['barcode'] as String? ?? '',
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            });
+          }
+        } catch (_) {}
+        onProgress?.call(++done, total);
+      }));
+
+      // Brief pause between batches to avoid hammering the API.
+      if (start + batchSize < rows.length) {
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
     }
   }
 
@@ -534,11 +559,16 @@ class DatabaseService {
   // ── Search History ────────────────────────────────────────────────────────
 
   Future<void> addSearchHistory(String query, int resultCount) async {
+    final trimmed = query.trim();
+    // Remove any existing entry for the same query so the new one sorts to
+    // the top of recent history and gets an updated timestamp + result count.
+    await _database.delete('search_history',
+        where: 'query = ?', whereArgs: [trimmed]);
     await _database.insert('search_history', {
-      'query': query.trim(),
+      'query': trimmed,
       'timestamp': DateTime.now().toIso8601String(),
       'resultCount': resultCount,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    });
   }
 
   Future<List<Map<String, dynamic>>> getSearchHistory({int limit = 20}) async {

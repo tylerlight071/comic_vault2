@@ -122,6 +122,9 @@ class _SeriesTrackerScreenState extends State<SeriesTrackerScreen> {
 
   Future<void> _loadFromDb() async {
     setState(() => _loading = true);
+    // Clear cached counts so any series whose total has changed on Comic Vine
+    // gets a fresh fetch this session.
+    _countCache.clear();
 
     final comics   = await DatabaseService.instance.getAllComics();
     final wishlist = await DatabaseService.instance.getWishlist();

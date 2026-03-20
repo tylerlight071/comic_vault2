@@ -78,16 +78,6 @@ class ComicVineService {
     return body;
   }
 
-  Future<Map<String, dynamic>> _post(Uri uri, Map<String, dynamic> body) async {
-    final response = await http
-        .post(uri,
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode(body))
-        .timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
-    return json.decode(response.body) as Map<String, dynamic>;
-  }
-
   // ── Result quality filtering & ranking ────────────────────────────────────
   //
   // Declared static so it can be referenced by the top-level
@@ -286,8 +276,9 @@ class ComicVineService {
 
   Future<String?> lookupUPC(String upc) async {
     try {
-      final uri = Uri.parse('https://api.upcitemdb.com/prod/trial/lookup');
-      final body = await _post(uri, {'upc': upc});
+      final uri = Uri.parse('https://api.upcitemdb.com/prod/trial/lookup')
+          .replace(queryParameters: {'upc': upc});
+      final body = await _get(uri);
       final items = body['items'] as List<dynamic>?;
       if (items != null && items.isNotEmpty) {
         final item  = items.first as Map<String, dynamic>;
@@ -463,11 +454,27 @@ class ComicVineService {
     if (desc != null) {
       desc = desc
           .replaceAll(RegExp(r'<[^>]*>'), '')
-          .replaceAll('&amp;', '&')
-          .replaceAll('&lt;', '<')
-          .replaceAll('&gt;', '>')
-          .replaceAll('&quot;', '"')
-          .replaceAll("&#39;", "'")
+          // Named HTML entities
+          .replaceAll('&amp;',   '&')
+          .replaceAll('&lt;',    '<')
+          .replaceAll('&gt;',    '>')
+          .replaceAll('&quot;',  '"')
+          .replaceAll('&apos;',  "'")
+          .replaceAll('&#39;',   "'")
+          .replaceAll('&nbsp;',  ' ')
+          .replaceAll('&mdash;', '—')
+          .replaceAll('&ndash;', '–')
+          .replaceAll('&lsquo;', '\u2018')
+          .replaceAll('&rsquo;', '\u2019')
+          .replaceAll('&ldquo;', '\u201C')
+          .replaceAll('&rdquo;', '\u201D')
+          .replaceAll('&hellip;', '…')
+          // Numeric decimal entities (e.g. &#160; &#8212;)
+          .replaceAllMapped(RegExp(r'&#(\d+);'),
+              (m) => String.fromCharCode(int.parse(m[1]!)))
+          // Numeric hex entities (e.g. &#xA0; &#x2014;)
+          .replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'),
+              (m) => String.fromCharCode(int.parse(m[1]!, radix: 16)))
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       if (desc.isEmpty) desc = null;

@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
-    Future.delayed(const Duration(milliseconds: 2400), _navigate);
+    Future.delayed(const Duration(milliseconds: 1600), _navigate);
   }
 
   void _navigate() {
