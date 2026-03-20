@@ -13,7 +13,7 @@ enum _ShelfType { recentlyAdded, continueReading, topRated }
 extension _ShelfTypeStyle on _ShelfType {
   Color get accentColor {
     switch (this) {
-      case _ShelfType.recentlyAdded:   return AppColors.textTertiary;
+      case _ShelfType.recentlyAdded:   return AppColors.accent;
       case _ShelfType.continueReading: return AppColors.textPrimary;
       case _ShelfType.topRated:        return AppColors.gold;
     }
@@ -202,21 +202,28 @@ class _ReadingProgressRibbonState extends State<_ReadingProgressRibbon>
             builder: (_, __) => LayoutBuilder(
               builder: (_, constraints) => Stack(children: [
                 Container(
-                  height: 3,
+                  height: 5,
                   width: constraints.maxWidth,
                   decoration: BoxDecoration(
                     color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeOut,
-                  height: 3,
+                  height: 5,
                   width: constraints.maxWidth * _progress.value,
                   decoration: BoxDecoration(
                     color: _barColor,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _barColor.withOpacity(0.55),
+                        blurRadius: 6,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ]),

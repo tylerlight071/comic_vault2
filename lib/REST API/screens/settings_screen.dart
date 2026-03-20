@@ -410,8 +410,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 1),
                   _actionTile(
                     icon: Icons.upload_rounded,
-                    iconBg: AppColors.surface2,
-                    iconColor: AppColors.textSecondary,
+                    iconBg: AppColors.accentDim,
+                    iconColor: AppColors.accent,
                     label: _exporting ? 'Exporting…' : 'Export Library',
                     description: 'Save a JSON backup of your full collection.',
                     onTap: _exportData,
@@ -421,8 +421,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 1),
                   _actionTile(
                     icon: Icons.download_rounded,
-                    iconBg: AppColors.surface2,
-                    iconColor: AppColors.textSecondary,
+                    iconBg: AppColors.greenOwnedDim,
+                    iconColor: AppColors.greenOwned,
                     label: _importing ? 'Importing…' : 'Import Library',
                     description: 'Restore from a JSON backup file.',
                     onTap: _importData,
@@ -508,7 +508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     AppHaptics.select();
                     _toggleShelf(key, v);
                   },
-                  activeColor: AppColors.textPrimary,
+                  activeColor: AppColors.greenOwned,
                   trackOutlineColor: WidgetStateProperty.all(
                       AppColors.border),
                 ),
@@ -604,7 +604,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 scaleDown: 0.95,
                 child: Text('Clear custom key',
                     style: tUi(12,
-                        color: AppColors.textTertiary,
+                        color: AppColors.redDestructive.withOpacity(0.75),
                         weight: FontWeight.w500)),
               ),
             ],
@@ -831,8 +831,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : null,
                     backgroundColor: AppColors.surface2,
                     valueColor: const AlwaysStoppedAnimation(
-                        AppColors.textPrimary),
-                    minHeight: 3,
+                        AppColors.accent),
+                    minHeight: 4,
                   ),
                 ),
                 const SizedBox(height: 8),

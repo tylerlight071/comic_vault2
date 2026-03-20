@@ -510,7 +510,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       backgroundColor: AppColors.bg,
       body: RefreshIndicator(
         onRefresh: _load,
-        color: AppColors.textPrimary,
+        color: AppColors.accent,
         backgroundColor: AppColors.surface2,
         strokeWidth: 2,
         displacement: 60,
@@ -729,7 +729,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       child: Container(
                         width: 8, height: 8,
                         decoration: BoxDecoration(
-                          color: AppColors.textPrimary,
+                          color: AppColors.accent,
                           shape: BoxShape.circle,
                           border: Border.all(
                               color: AppColors.bg, width: 1.5),

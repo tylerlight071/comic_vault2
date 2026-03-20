@@ -3,26 +3,13 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_colors.dart';
 import '../theme/models/comic.dart';
 import '../theme/services/cover_palette_service.dart';
+import '../theme/typography.dart';
 import 'pressable.dart';
 import 'skeleton_box.dart';
-
-TextStyle _ui(double size,
-        {Color? color,
-        FontWeight weight = FontWeight.w500,
-        double? height,
-        double letterSpacing = 0}) =>
-    GoogleFonts.dmSans(
-      color: color ?? AppColors.textPrimary,
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
 
 class ComicCard extends StatefulWidget {
   final Comic comic;
@@ -129,7 +116,7 @@ class _ComicCardState extends State<ComicCard> {
                     if (comic.issueNumber != null)
                       Text(
                         '#${comic.issueNumber}',
-                        style: _ui(9,
+                        style: tUi(9,
                             color: Colors.white.withOpacity(0.45),
                             weight: FontWeight.w700,
                             letterSpacing: 0.4),
@@ -137,7 +124,7 @@ class _ComicCardState extends State<ComicCard> {
                     const SizedBox(height: 1),
                     Text(
                       comic.seriesName,
-                      style: _ui(11,
+                      style: tUi(11,
                           color: Colors.white,
                           weight: FontWeight.w700,
                           height: 1.2),
@@ -172,7 +159,7 @@ class _ComicCardState extends State<ComicCard> {
                           const SizedBox(width: 2),
                           Text(
                             '${comic.starRating}',
-                            style: _ui(10,
+                            style: tUi(10,
                                 color: Colors.white,
                                 weight: FontWeight.w700),
                           ),

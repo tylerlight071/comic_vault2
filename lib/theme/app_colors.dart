@@ -32,6 +32,8 @@ abstract class AppColors {
   static const Color greenOwned     = Color(0xFF30D158);
   static const Color greenOwnedDim  = Color(0xFF0E2E18);
   static const Color redDestructive = Color(0xFFFF453A);
+  static const Color accent         = Color(0xFF0A84FF);  // info / new-arrival blue
+  static const Color accentDim      = Color(0xFF07233F);  // dark tint for blue backgrounds
 
   // Skeleton
   static const Color skeletonBase      = Color(0xFF222228);
@@ -44,4 +46,5 @@ abstract class AppColors {
   static Color gold_(double o) => gold.withOpacity(o);
   static Color green_(double o) => greenOwned.withOpacity(o);
   static Color red_(double o) => redDestructive.withOpacity(o);
+  static Color accent_(double o) => accent.withOpacity(o);
 }

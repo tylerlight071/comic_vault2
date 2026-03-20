@@ -150,25 +150,25 @@ class _StatsScreenState extends State<StatsScreen> {
                     if (_topSeries.isNotEmpty) ...[
                       _sectionLabel('TOP SERIES'),
                       const SizedBox(height: 10),
-                      _buildBarChart(_topSeries),
+                      _buildBarChart(_topSeries, barColor: AppColors.gold),
                       const SizedBox(height: 28),
                     ],
                     if (_topPublishers.isNotEmpty) ...[
                       _sectionLabel('PUBLISHERS'),
                       const SizedBox(height: 10),
-                      _buildBarChart(_topPublishers),
+                      _buildBarChart(_topPublishers, barColor: AppColors.accent),
                       const SizedBox(height: 28),
                     ],
                     if (_byDecade.isNotEmpty) ...[
                       _sectionLabel('BY DECADE'),
                       const SizedBox(height: 10),
-                      _buildBarChart(_byDecade),
+                      _buildBarChart(_byDecade, barColor: AppColors.greenOwned),
                       const SizedBox(height: 28),
                     ],
                     if (_byCondition.isNotEmpty) ...[
                       _sectionLabel('CONDITION'),
                       const SizedBox(height: 10),
-                      _buildBarChart(_byCondition),
+                      _buildBarChart(_byCondition, barColor: AppColors.redDestructive),
                     ],
                   ],
                 ),
@@ -307,8 +307,8 @@ class _StatsScreenState extends State<StatsScreen> {
             child: LinearProgressIndicator(
               value: pct,
               backgroundColor: AppColors.surface3,
-              valueColor: const AlwaysStoppedAnimation(AppColors.textPrimary),
-              minHeight: 4,
+              valueColor: const AlwaysStoppedAnimation(AppColors.greenOwned),
+              minHeight: 6,
             ),
           ),
           if (_rated > 0) ...[
@@ -330,7 +330,8 @@ class _StatsScreenState extends State<StatsScreen> {
 
   // ── Bar chart ─────────────────────────────────────────────────────────────
 
-  Widget _buildBarChart(List<MapEntry<String, int>> entries) {
+  Widget _buildBarChart(List<MapEntry<String, int>> entries,
+      {Color barColor = AppColors.textPrimary}) {
     if (entries.isEmpty) return const SizedBox.shrink();
     final max = entries.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
@@ -374,8 +375,15 @@ class _StatsScreenState extends State<StatsScreen> {
                       child: Container(
                         height: 6,
                         decoration: BoxDecoration(
-                          color: AppColors.textPrimary,
+                          color: barColor,
                           borderRadius: BorderRadius.circular(3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: barColor.withOpacity(0.4),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                       ),
                     ),

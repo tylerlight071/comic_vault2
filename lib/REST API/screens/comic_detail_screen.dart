@@ -680,7 +680,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                     Text(
                       _descExpanded ? 'Show less' : 'Read more',
                       style: tUi(13,
-                          color: AppColors.textTertiary,
+                          color: AppColors.accent,
                           weight: FontWeight.w600),
                     ),
                     const SizedBox(width: 3),
@@ -688,7 +688,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       _descExpanded
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textTertiary,
+                      color: AppColors.accent,
                       size: 16,
                     ),
                   ]),
@@ -747,12 +747,12 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
           height: 52,
           decoration: BoxDecoration(
             color: _comic.isRead
-                ? AppColors.textPrimary
+                ? AppColors.greenOwnedDim
                 : AppColors.surface2,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
                 color: _comic.isRead
-                    ? Colors.transparent
+                    ? AppColors.green_(0.4)
                     : AppColors.border),
           ),
           child: Row(
@@ -763,7 +763,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
                   color: _comic.isRead
-                      ? AppColors.bg
+                      ? AppColors.greenOwned
                       : AppColors.textSecondary,
                   size: 18,
                 ),
@@ -772,7 +772,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                   _comic.isRead ? 'Read' : 'Mark as Read',
                   style: tUi(14,
                       color: _comic.isRead
-                          ? AppColors.bg
+                          ? AppColors.greenOwned
                           : AppColors.textSecondary,
                       weight: FontWeight.w700),
                 ),
@@ -914,7 +914,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.format_list_numbered_rounded,
-                    color: AppColors.textSecondary, size: 17),
+                    color: AppColors.accent, size: 17),
                 const SizedBox(width: 8),
                 Text('View Full Run',
                     style: tUi(14,
@@ -922,7 +922,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         weight: FontWeight.w600)),
                 const SizedBox(width: 6),
                 const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textTertiary, size: 17),
+                    color: AppColors.accent, size: 17),
               ]),
         ),
       );

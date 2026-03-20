@@ -48,13 +48,21 @@ class ComicVineService {
       'id,name,volume,issue_number,cover_date,image,description,person_credits';
   static const int _defaultPageSize = 20;
 
-  static const String _hardcodedApiKey =
-      'd2d3800b8f0302c128ea8e91995e6adb27a30a9e';
+  // Injected at build time via --dart-define-from-file=dart_defines.env
+  // Never hardcode a real key here — keep this empty and provide the key
+  // through dart_defines.env (gitignored) or the in-app Settings → API field.
+  static const String _envApiKey =
+      String.fromEnvironment('COMIC_VINE_API_KEY', defaultValue: '');
 
   Future<String> _apiKey() async {
     final prefs = await SharedPreferences.getInstance();
     final custom = prefs.getString('comic_vine_api_key')?.trim();
-    return (custom != null && custom.isNotEmpty) ? custom : _hardcodedApiKey;
+    if (custom != null && custom.isNotEmpty) return custom;
+    if (_envApiKey.isNotEmpty) return _envApiKey;
+    throw Exception(
+      'No Comic Vine API key configured. '
+      'Add one in Settings → API, or run the app with --dart-define-from-file=dart_defines.env.',
+    );
   }
 
   Future<Map<String, dynamic>> _get(Uri uri) async {

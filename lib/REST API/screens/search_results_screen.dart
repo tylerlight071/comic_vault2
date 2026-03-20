@@ -933,7 +933,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: AppColors.textPrimary,
+                            color: AppColors.accent,
                             shape: BoxShape.circle,
                             border: Border.all(
                                 color: AppColors.bg, width: 1.5),
