@@ -1,4 +1,4 @@
-// lib/REST API/screens/search_results_screen.dart
+// lib/REST API/screens/search_results/search_results_screen.dart
 
 // ignore_for_file: deprecated_member_use
 
@@ -7,20 +7,20 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../theme/typography.dart';
+import '../../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../../utils/bottom_bouncing_scroll_physics.dart';
+import '../../../../utils/bottom_bouncing_scroll_physics.dart';
 
-import '../../theme/app_colors.dart';
-import '../../theme/models/comic.dart';
-import '../../theme/services/comic_vine_service.dart';
-import '../../theme/services/cover_palette_service.dart';
-import '../../theme/services/database_service.dart';
-import '../../theme/utils/haptics.dart';
-import '../../../widgets/pressable.dart';
-import '../../../widgets/skeleton_box.dart';
-import 'comic_detail_screen.dart';
+import '../../../theme/app_colors.dart';
+import '../../../theme/models/comic.dart';
+import '../../../theme/services/comic_vine_service.dart';
+import '../../../theme/services/cover_palette_service.dart';
+import '../../../theme/services/database_service.dart';
+import '../../../theme/utils/haptics.dart';
+import '../../../../widgets/pressable.dart';
+import '../../../../widgets/skeleton_box.dart';
+import '../comic_detail/comic_detail_screen.dart';
 
 part 'search_results_widgets.dart';
 

@@ -14,7 +14,7 @@ import '../../theme/models/comic.dart';
 import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
-import 'comic_detail_screen.dart';
+import 'comic_detail/comic_detail_screen.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-// lib/REST API/screens/settings_screen.dart
+// lib/REST API/screens/settings/settings_screen.dart
 
 // ignore_for_file: deprecated_member_use
 
@@ -10,18 +10,18 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../theme/models/home_layout.dart';
-import '../../theme/models/comic.dart';
-import '../../theme/models/shelf_config.dart';
-import '../../theme/services/app_settings.dart';
-import '../../theme/services/encryption_service.dart';
-import '../../theme/typography.dart';
+import '../../../theme/models/home_layout.dart';
+import '../../../theme/models/comic.dart';
+import '../../../theme/models/shelf_config.dart';
+import '../../../theme/services/app_settings.dart';
+import '../../../theme/services/encryption_service.dart';
+import '../../../theme/typography.dart';
 
-import '../../../utils/bottom_bouncing_scroll_physics.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/services/database_service.dart';
-import '../../theme/utils/haptics.dart';
-import '../../../widgets/pressable.dart';
+import '../../../../utils/bottom_bouncing_scroll_physics.dart';
+import '../../../theme/app_colors.dart';
+import '../../../theme/services/database_service.dart';
+import '../../../theme/utils/haptics.dart';
+import '../../../../widgets/pressable.dart';
 
 part 'settings_widgets.dart';
 

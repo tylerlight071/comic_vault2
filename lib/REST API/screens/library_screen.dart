@@ -17,7 +17,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/models/comic.dart';
 import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
-import 'comic_detail_screen.dart';
+import 'comic_detail/comic_detail_screen.dart';
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 

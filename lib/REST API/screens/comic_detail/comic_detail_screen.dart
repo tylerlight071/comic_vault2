@@ -1,4 +1,4 @@
-// lib/REST API/screens/comic_detail_screen.dart
+// lib/REST API/screens/comic_detail/comic_detail_screen.dart
 
 // ignore_for_file: deprecated_member_use
 
@@ -7,24 +7,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../theme/typography.dart';
+import '../../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:http/http.dart' as http;
-import '../../theme/services/encryption_service.dart';
+import '../../../theme/services/encryption_service.dart';
 
-import '../../../utils/bottom_bouncing_scroll_physics.dart';
+import '../../../../utils/bottom_bouncing_scroll_physics.dart';
 
-import '../../theme/app_colors.dart';
-import '../../theme/models/comic.dart';
-import '../../theme/services/database_service.dart';
-import '../../theme/services/comic_vine_service.dart';
-import '../../theme/services/cover_palette_service.dart';
-import '../../theme/services/app_settings.dart';
-import '../../theme/utils/haptics.dart';
-import '../../../widgets/pressable.dart';
-import '../../../widgets/star_rating_widget.dart';
-import '../../../widgets/skeleton_box.dart';
-import 'series_run_screen.dart';
+import '../../../theme/app_colors.dart';
+import '../../../theme/models/comic.dart';
+import '../../../theme/services/database_service.dart';
+import '../../../theme/services/comic_vine_service.dart';
+import '../../../theme/services/cover_palette_service.dart';
+import '../../../theme/services/app_settings.dart';
+import '../../../theme/utils/haptics.dart';
+import '../../../../widgets/pressable.dart';
+import '../../../../widgets/star_rating_widget.dart';
+import '../../../../widgets/skeleton_box.dart';
+import '../series_run_screen.dart';
 
 part 'comic_detail_widgets.dart';
 part 'comic_detail_sections.dart';

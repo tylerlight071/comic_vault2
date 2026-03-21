@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"import ''comic_detail_screen.dart''\\\\|import ''search_results_screen.dart''\\\\|import ''settings_screen.dart''\\\\|import ''../comic_detail_screen.dart''\\\\|import ''../search_results_screen.dart''\\\\|import ''../settings_screen.dart''\" \"c:\\\\Users\\\\tyler\\\\OneDrive\\\\Documents\\\\Coding\\\\comic_vault2\\\\lib\")"
+    ]
+  }
+}
