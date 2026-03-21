@@ -8,6 +8,7 @@ import 'theme/services/database_service.dart';
 import 'theme/services/cover_palette_service.dart';
 import 'theme/services/app_settings.dart';
 import 'theme/services/encryption_service.dart';
+import 'REST API/screens/auth_gate.dart';
 import 'REST API/screens/splash_screen.dart';
 
 void main() async {
@@ -43,7 +44,7 @@ class ComicVaultApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       scrollBehavior: const _ClampingScrollBehavior(),
-      home: const SplashScreen(),
+      home: const AuthGate(child: SplashScreen()),
     );
   }
 

@@ -15,8 +15,8 @@ dependencies:
   # Barcode scanning
   mobile_scanner: ^6.0.0
 
-  # Local database
-  sqflite: ^2.3.3+1
+  # Local database — SQLCipher provides AES-256 full-database encryption
+  sqflite_sqlcipher: ^3.3.0
   path: ^1.9.0
 
   # Networking & images
@@ -31,6 +31,9 @@ dependencies:
   shared_preferences: ^2.3.2
   flutter_secure_storage: ^9.2.2
   encrypt: ^5.0.3
+
+  # Biometric / device-credential authentication
+  local_auth: ^2.3.0
 
   # App info & sharing
   package_info_plus: ^8.0.0

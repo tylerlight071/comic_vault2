@@ -1,6 +1,8 @@
 // lib/theme/services/database_service.dart
 
-import 'package:sqflite/sqflite.dart';
+import 'dart:io';
+
+import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/comic.dart';
 import 'comic_vine_service.dart';
@@ -14,9 +16,18 @@ class DatabaseService {
   bool _ftsAvailable = false;
 
   Future<void> init() async {
-    final dbPath = await getDatabasesPath();
+    final dbPath   = await getDatabasesPath();
+    final fullPath = join(dbPath, 'comic_vault.db');
+
+    // Retrieve (or generate) the SQLCipher AES-256 encryption key.
+    final dbKey = await EncryptionService.getOrCreateDbKey();
+
+    // One-time migration: encrypt any pre-existing plain SQLite database.
+    await _encryptExistingDbIfNeeded(fullPath, dbKey);
+
     _db = await openDatabase(
-      join(dbPath, 'comic_vault.db'),
+      fullPath,
+      password: dbKey,
       version: 9,
       onCreate: (db, _) async {
         await db.execute('''
@@ -251,6 +262,54 @@ class DatabaseService {
   Database get _database {
     if (_db == null) throw StateError('Database not initialised.');
     return _db!;
+  }
+
+  // ── SQLCipher migration ────────────────────────────────────────────────────
+  //
+  // Encrypts an existing plain-text SQLite database in place using SQLCipher's
+  // PRAGMA rekey. The original file is backed up before the operation; if
+  // anything goes wrong the backup is restored so no data is ever lost.
+  // A flag in secure storage prevents re-running the migration on every launch.
+
+  static Future<void> _encryptExistingDbIfNeeded(
+      String path, String key) async {
+    const flagKey = 'db_sqlcipher_migrated';
+    if (await EncryptionService.secureRead(flagKey) == '1') return;
+
+    final file = File(path);
+    if (!await file.exists()) {
+      // Fresh install — DB will be created encrypted; nothing to migrate.
+      await EncryptionService.secureWrite(flagKey, '1');
+      return;
+    }
+
+    final backup = File('$path.bak');
+    try {
+      // Backup the original before touching it.
+      await file.copy(backup.path);
+
+      // Open without a password: SQLCipher treats this as plain-text mode,
+      // which is backwards-compatible with standard SQLite files.
+      final db = await openDatabase(path);
+
+      // Re-key encrypts the database in place with AES-256.
+      await db.execute("PRAGMA rekey = '$key'");
+      await db.close();
+
+      await backup.delete().catchError((_) => backup);
+      await EncryptionService.secureWrite(flagKey, '1');
+    } catch (_) {
+      // Migration failed — restore the original file so data is preserved.
+      // The app continues with the unencrypted DB; field-level encryption
+      // (notes, loanedTo) still protects the most sensitive columns.
+      if (await backup.exists()) {
+        try {
+          if (await file.exists()) await file.delete();
+          await backup.rename(path);
+        } catch (_) {}
+      }
+      // Leave the flag unset so we retry on the next launch.
+    }
   }
 
   // ── Field-level encryption helpers ────────────────────────────────────────

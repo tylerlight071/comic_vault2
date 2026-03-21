@@ -1,6 +1,7 @@
 // lib/theme/services/encryption_service.dart
 
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart';
@@ -76,4 +77,24 @@ class EncryptionService {
 
   /// Convenience — deletes a key from secure storage.
   static Future<void> secureDelete(String key) => _storage.delete(key: key);
+
+  // ── SQLCipher database key ─────────────────────────────────────────────────
+
+  static const _dbKeyName = 'comic_vault_db_key';
+
+  /// Returns the SQLCipher database passphrase, generating and persisting it
+  /// on first call. The 32-byte random key is base64url-encoded (no +/= chars)
+  /// so it is safe to embed directly in a PRAGMA SQL statement.
+  static Future<String> getOrCreateDbKey() async {
+    var key = await _storage.read(key: _dbKeyName);
+    if (key == null) {
+      final rng   = Random.secure();
+      final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
+      // base64url avoids + and / which could cause issues in PRAGMA strings;
+      // strip = padding so the string is pure alphanumeric + - _
+      key = base64Url.encode(bytes).replaceAll('=', '');
+      await _storage.write(key: _dbKeyName, value: key);
+    }
+    return key;
+  }
 }

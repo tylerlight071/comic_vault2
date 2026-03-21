@@ -3,7 +3,11 @@
     "allow": [
       "Bash(find /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib -type f -name *.dart)",
       "Bash(find /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/ios -maxdepth 3 -name Info.plist -o -name *.swift)",
-      "Bash(grep -r \"print\\\\|log\\\\|println\" /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib/*.dart)"
+      "Bash(grep -r \"print\\\\|log\\\\|println\" /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib/*.dart)",
+      "Bash(flutter pub:*)",
+      "Read(//c/Users/tyler/AppData/Local/Pub/Cache/hosted/pub.dev/sqflite_sqlcipher-3.3.0/**)",
+      "Read(//c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/$HOME/AppData/Local/Pub/Cache/hosted/pub.dev/**)",
+      "Bash(grep -r \"rekey\\\\|password\\\\|PRAGMA\" c:/Users/tyler/AppData/Local/Pub/Cache/hosted/pub.dev/sqflite_sqlcipher-3.3.0/ --include=*.kt --include=*.java -l)"
     ]
   }
 }
