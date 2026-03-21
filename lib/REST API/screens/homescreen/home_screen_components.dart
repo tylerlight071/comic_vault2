@@ -29,39 +29,21 @@ extension _ShelfTypeStyle on _ShelfType {
 
   double get cardWidth {
     switch (this) {
-      case _ShelfType.recentlyAdded:   return 124;
-      case _ShelfType.continueReading: return 158;
-      case _ShelfType.topRated:        return 124;
+      case _ShelfType.recentlyAdded:   return 130;
+      case _ShelfType.continueReading: return 185;
+      case _ShelfType.topRated:        return 130;
     }
   }
 
   double get shelfHeight {
     switch (this) {
-      case _ShelfType.recentlyAdded:   return 210;
-      case _ShelfType.continueReading: return 232;
-      case _ShelfType.topRated:        return 210;
+      case _ShelfType.recentlyAdded:   return 195;
+      case _ShelfType.continueReading: return 275;
+      case _ShelfType.topRated:        return 195;
     }
   }
 
-  // Fixed pixel height for the cover image portion of a shelf card.
-  //
-  // By decoupling the cover height from the text below it, every card in a
-  // shelf has an identical image size regardless of whether the series name
-  // wraps to one line or two. The text sits in the remaining space below.
-  //
-  // Breakdown for recentlyAdded / topRated (shelfHeight = 210):
-  //   coverHeight (140) + gap (8) + issueNumber (~12) + gap (1)
-  //   + seriesName (≤2 lines, ~28) + gap (3) + date (~12) = 204  ✓
-  //
-  // Breakdown for continueReading (shelfHeight = 232):
-  //   Text is overlaid inside the image, so coverHeight == shelfHeight.
-  double get coverHeight {
-    switch (this) {
-      case _ShelfType.recentlyAdded:   return 140;
-      case _ShelfType.continueReading: return 232; // full-bleed
-      case _ShelfType.topRated:        return 140;
-    }
-  }
+
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -321,7 +303,7 @@ class _Shelf extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     itemCount: 5,
                     itemBuilder: (_, __) => Container(
-                      width: 124,
+                      width: 150,
                       margin: const EdgeInsets.only(right: 12),
                       child: const SkeletonShelfCard(),
                     ),
@@ -431,121 +413,119 @@ class _PalettedShelfCardState extends State<_PalettedShelfCard> {
     final comic      = widget.comic;
     final isTopRated = widget.shelfType == _ShelfType.topRated;
     final isRecent   = widget.shelfType == _ShelfType.recentlyAdded;
-    final coverH     = widget.shelfType.coverHeight;
 
     return Pressable(
       onTap: widget.onTap,
       haptic: HapticStyle.none,
       scaleDown: 0.94,
-      child: SizedBox(
+      child: Container(
         width: widget.shelfType.cardWidth,
-        child: Container(
-          margin: const EdgeInsets.only(right: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, // don't stretch to fill shelf height
-            children: [
-              // ── Cover — fixed height, always the same ──────────────────
-              SizedBox(
-                height: coverH,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: Stack(fit: StackFit.expand, children: [
-                    _CoverImage(url: comic.coverImageUrl),
+        margin: const EdgeInsets.only(right: 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: Stack(fit: StackFit.expand, children: [
+            _CoverImage(url: comic.coverImageUrl),
 
-                    // Palette-tinted bottom gradient
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeOut,
-                        height: 55,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              _paletteColor.withOpacity(0.95),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+            // Palette-tinted bottom gradient
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOut,
+                height: 70,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      _paletteColor.withOpacity(0.97),
+                      Colors.black.withOpacity(0.18),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
 
-                    // Read check badge
-                    if (comic.isRead)
-                      Positioned(
-                        top: 7, right: 7,
-                        child: Container(
-                          width: 22, height: 22,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(11),
-                          ),
-                          child: const Icon(Icons.check_rounded,
-                              color: AppColors.greenOwned, size: 12),
-                        ),
-                      ),
+            // Read check badge
+            if (comic.isRead)
+              Positioned(
+                top: 7, right: 7,
+                child: Container(
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      color: AppColors.greenOwned, size: 12),
+                ),
+              ),
 
-                    // Gold star badge — Top Rated only
-                    if (isTopRated && comic.starRating > 0)
-                      Positioned(
-                        top: 7, left: 7,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: AppColors.gold_(0.3)),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.star_rounded,
-                                color: AppColors.gold, size: 9),
-                            const SizedBox(width: 3),
-                            Text('${comic.starRating}',
-                                style: tUi(9,
-                                    color: Colors.white,
-                                    weight: FontWeight.w700)),
-                          ]),
-                        ),
-                      ),
+            // Gold star badge — Top Rated only
+            if (isTopRated && comic.starRating > 0)
+              Positioned(
+                top: 7, left: 7,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.gold_(0.3)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.star_rounded,
+                        color: AppColors.gold, size: 9),
+                    const SizedBox(width: 3),
+                    Text('${comic.starRating}',
+                        style: tUi(9,
+                            color: Colors.white,
+                            weight: FontWeight.w700)),
                   ]),
                 ),
               ),
 
-              // ── Text below cover ─────────────────────────────────────────
-              // Lives outside the image SizedBox so it never compresses it.
-              const SizedBox(height: 8),
-              if (comic.issueNumber != null)
-                Text('#${comic.issueNumber}',
-                    style: tUi(9,
-                        color: AppColors.textTertiary,
-                        weight: FontWeight.w700,
-                        letterSpacing: 0.5)),
-              const SizedBox(height: 1),
-              Text(
-                comic.seriesName,
-                style: tUi(12,
-                    color: AppColors.textSecondary,
-                    weight: FontWeight.w600,
-                    height: 1.25),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-
-              // Relative date — Recently Added only
-              if (isRecent) ...[
-                const SizedBox(height: 3),
-                Text(
-                  _relativeDate(comic.addedDate),
-                  style: tUi(10,
-                      color: AppColors.textDisabled, weight: FontWeight.w400),
+            // Overlaid bottom text
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(9, 0, 9, 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (comic.issueNumber != null)
+                      Text('#${comic.issueNumber}',
+                          style: tUi(9,
+                              color: Colors.white.withOpacity(0.5),
+                              weight: FontWeight.w700,
+                              letterSpacing: 0.4)),
+                    const SizedBox(height: 2),
+                    Text(
+                      comic.seriesName,
+                      style: tUi(11,
+                          color: Colors.white,
+                          weight: FontWeight.w700,
+                          height: 1.25),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (isRecent) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _relativeDate(comic.addedDate),
+                        style: tUi(9,
+                            color: Colors.white.withOpacity(0.5),
+                            weight: FontWeight.w400),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ]),
         ),
       ),
     )
@@ -608,7 +588,7 @@ class _ContinueReadingCardState extends State<_ContinueReadingCard> {
       haptic: HapticStyle.none,
       scaleDown: 0.94,
       child: Container(
-        width: 158,
+        width: 185,
         margin: const EdgeInsets.only(right: 12),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(13),

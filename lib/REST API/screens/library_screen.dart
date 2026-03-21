@@ -43,7 +43,7 @@ extension _SortModeLabel on _SortMode {
   }
 }
 
-enum _FilterMode { all, read, unread, reading }
+enum _FilterMode { all, read, unread, reading, loaned }
 
 extension _FilterModeLabel on _FilterMode {
   String get label {
@@ -52,6 +52,7 @@ extension _FilterModeLabel on _FilterMode {
       case _FilterMode.read:    return 'Read';
       case _FilterMode.unread:  return 'Unread';
       case _FilterMode.reading: return 'Reading';
+      case _FilterMode.loaned:  return 'Loaned';
     }
   }
 }
@@ -72,9 +73,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   List<Comic> _all = [];
   bool _loading = true;
 
-  _SortMode   _sort   = _SortMode.dateAdded;
-  _FilterMode _filter = _FilterMode.all;
-  _ViewMode   _view   = _ViewMode.grid;
+  _SortMode   _sort      = _SortMode.dateAdded;
+  _FilterMode _filter    = _FilterMode.all;
+  _ViewMode   _view      = _ViewMode.grid;
+  String?     _activeTag;
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
@@ -95,7 +97,16 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   // Returns true when anything deviates from the defaults
   bool get _hasActiveFilters =>
-      _sort != _SortMode.dateAdded || _filter != _FilterMode.all;
+      _sort != _SortMode.dateAdded || _filter != _FilterMode.all || _activeTag != null;
+
+  /// All unique tags across the library, sorted alphabetically.
+  List<String> get _allTags {
+    final set = <String>{};
+    for (final c in _all) {
+      set.addAll(c.tagList);
+    }
+    return set.toList()..sort();
+  }
 
   @override
   void initState() {
@@ -150,6 +161,11 @@ class _LibraryScreenState extends State<LibraryScreen>
     if (_filter == _FilterMode.read)    list = list.where((c) => c.isRead).toList();
     if (_filter == _FilterMode.unread)  list = list.where((c) => !c.isRead).toList();
     if (_filter == _FilterMode.reading) list = list.where((c) => c.isReading).toList();
+    if (_filter == _FilterMode.loaned)  list = list.where((c) => c.loanedTo != null).toList();
+
+    if (_activeTag != null) {
+      list = list.where((c) => c.tagList.contains(_activeTag)).toList();
+    }
 
     final q = _query.trim().toLowerCase();
     if (q.isNotEmpty) {
@@ -243,6 +259,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     // and only apply on "Done" — feel free to change to live-apply if preferred.
     var tempSort   = _sort;
     var tempFilter = _filter;
+    var tempTag    = _activeTag;
+    final tags     = _allTags;
 
     showModalBottomSheet(
       context: context,
@@ -250,12 +268,44 @@ class _LibraryScreenState extends State<LibraryScreen>
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheetState) {
+          Widget _chip({
+            required String label,
+            required bool active,
+            required VoidCallback onTap,
+            IconData? icon,
+          }) =>
+              Pressable(
+                onTap: () { AppHaptics.light(); onTap(); },
+                haptic: HapticStyle.none,
+                scaleDown: 0.94,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.surface3 : AppColors.surface1,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: active ? AppColors.borderFocus : AppColors.border),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 13,
+                          color: active ? AppColors.textPrimary : AppColors.textTertiary),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(label,
+                        style: tUi(13,
+                            color: active ? AppColors.textPrimary : AppColors.textSecondary,
+                            weight: active ? FontWeight.w600 : FontWeight.w400)),
+                  ]),
+                ),
+              );
+
           return Container(
             decoration: const BoxDecoration(
               color: AppColors.bgElevated,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            // SafeArea padding for home bar
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(ctx).viewInsets.bottom +
                   MediaQuery.of(ctx).padding.bottom,
@@ -264,211 +314,135 @@ class _LibraryScreenState extends State<LibraryScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Handle ────────────────────────────────────────────────
                 Center(
                   child: Container(
                     margin: const EdgeInsets.only(top: 12, bottom: 4),
-                    width: 36,
-                    height: 4,
+                    width: 36, height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
-
-                // ── Header row ────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 16, 4),
-                  child: Row(
-                    children: [
-                      Text('Sort & Filter',
-                          style: tDisplay(18,
-                              weight: FontWeight.w700, letterSpacing: -0.3)),
-                      const Spacer(),
-                      // Reset button — only visible when something is non-default
-                      if (tempSort != _SortMode.dateAdded ||
-                          tempFilter != _FilterMode.all)
-                        Pressable(
-                          onTap: () {
-                            AppHaptics.light();
-                            setSheetState(() {
-                              tempSort   = _SortMode.dateAdded;
-                              tempFilter = _FilterMode.all;
-                            });
-                          },
-                          haptic: HapticStyle.none,
-                          scaleDown: 0.9,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Text('Reset',
-                                style: tUi(12,
-                                    color: AppColors.textSecondary,
-                                    weight: FontWeight.w500)),
+                  child: Row(children: [
+                    Text('Sort & Filter',
+                        style: tDisplay(18,
+                            weight: FontWeight.w700, letterSpacing: -0.3)),
+                    const Spacer(),
+                    if (tempSort != _SortMode.dateAdded ||
+                        tempFilter != _FilterMode.all ||
+                        tempTag != null)
+                      Pressable(
+                        onTap: () {
+                          AppHaptics.light();
+                          setSheetState(() {
+                            tempSort   = _SortMode.dateAdded;
+                            tempFilter = _FilterMode.all;
+                            tempTag    = null;
+                          });
+                        },
+                        haptic: HapticStyle.none,
+                        scaleDown: 0.9,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface2,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.border),
                           ),
+                          child: Text('Reset',
+                              style: tUi(12,
+                                  color: AppColors.textSecondary,
+                                  weight: FontWeight.w500)),
                         ),
-                    ],
-                  ),
+                      ),
+                  ]),
                 ),
-
-                Divider(
-                    height: 1,
+                Divider(height: 1,
                     color: AppColors.border.withOpacity(0.5),
-                    indent: 20,
-                    endIndent: 20),
-
+                    indent: 20, endIndent: 20),
                 const SizedBox(height: 20),
 
-                // ── Sort section ──────────────────────────────────────────
+                // ── Sort ──────────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text('SORT BY',
-                      style: tUi(10,
-                          color: AppColors.textTertiary,
-                          weight: FontWeight.w700,
-                          letterSpacing: 1.4)),
+                      style: tUi(10, color: AppColors.textTertiary,
+                          weight: FontWeight.w700, letterSpacing: 1.4)),
                 ),
                 const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _SortMode.values.map((s) {
-                      final active = tempSort == s;
-                      return Pressable(
-                        onTap: () {
-                          AppHaptics.light();
-                          setSheetState(() => tempSort = s);
-                        },
-                        haptic: HapticStyle.none,
-                        scaleDown: 0.94,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: active
-                                ? AppColors.surface3
-                                : AppColors.surface1,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: active
-                                  ? AppColors.borderFocus
-                                  : AppColors.border,
-                            ),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(s.icon,
-                                size: 13,
-                                color: active
-                                    ? AppColors.textPrimary
-                                    : AppColors.textTertiary),
-                            const SizedBox(width: 6),
-                            Text(s.label,
-                                style: tUi(13,
-                                    color: active
-                                        ? AppColors.textPrimary
-                                        : AppColors.textSecondary,
-                                    weight: active
-                                        ? FontWeight.w600
-                                        : FontWeight.w400)),
-                          ]),
-                        ),
-                      );
-                    }).toList(),
+                    spacing: 8, runSpacing: 8,
+                    children: _SortMode.values.map((s) => _chip(
+                      label: s.label,
+                      active: tempSort == s,
+                      icon: s.icon,
+                      onTap: () => setSheetState(() => tempSort = s),
+                    )).toList(),
                   ),
                 ),
-
                 const SizedBox(height: 22),
 
-                // ── Filter section ────────────────────────────────────────
+                // ── Filter ────────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text('SHOW',
-                      style: tUi(10,
-                          color: AppColors.textTertiary,
-                          weight: FontWeight.w700,
-                          letterSpacing: 1.4)),
+                      style: tUi(10, color: AppColors.textTertiary,
+                          weight: FontWeight.w700, letterSpacing: 1.4)),
                 ),
                 const SizedBox(height: 10),
-
-                // Full-width segmented control feel
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface1,
-                      borderRadius: BorderRadius.circular(11),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      children: _FilterMode.values.map((f) {
-                        final active = tempFilter == f;
-                        final isFirst = f == _FilterMode.values.first;
-                        final isLast  = f == _FilterMode.values.last;
-                        return Expanded(
-                          child: Pressable(
-                            onTap: () {
-                              AppHaptics.light();
-                              setSheetState(() => tempFilter = f);
-                            },
-                            haptic: HapticStyle.none,
-                            scaleDown: 0.96,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? AppColors.surface3
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.horizontal(
-                                  left:  isFirst
-                                      ? const Radius.circular(10)
-                                      : Radius.zero,
-                                  right: isLast
-                                      ? const Radius.circular(10)
-                                      : Radius.zero,
-                                ),
-                                border: active
-                                    ? Border.all(color: AppColors.borderFocus)
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Text(f.label,
-                                    style: tUi(13,
-                                        color: active
-                                            ? AppColors.textPrimary
-                                            : AppColors.textSecondary,
-                                        weight: active
-                                            ? FontWeight.w600
-                                            : FontWeight.w400)),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                  child: Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: _FilterMode.values.map((f) => _chip(
+                      label: f.label,
+                      active: tempFilter == f,
+                      onTap: () => setSheetState(() => tempFilter = f),
+                    )).toList(),
                   ),
                 ),
 
+                // ── Tags ──────────────────────────────────────────────────
+                if (tags.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('TAGS',
+                        style: tUi(10, color: AppColors.textTertiary,
+                            weight: FontWeight.w700, letterSpacing: 1.4)),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: tags.map((t) => _chip(
+                        label: t,
+                        active: tempTag == t,
+                        onTap: () => setSheetState(
+                            () => tempTag = tempTag == t ? null : t),
+                      )).toList(),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
 
-                // ── Done button ───────────────────────────────────────────
+                // ── Apply ─────────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Pressable(
                     onTap: () {
                       AppHaptics.medium();
                       setState(() {
-                        _sort   = tempSort;
-                        _filter = tempFilter;
+                        _sort      = tempSort;
+                        _filter    = tempFilter;
+                        _activeTag = tempTag;
                         _invalidateCache();
                       });
                       Navigator.pop(ctx);
@@ -484,8 +458,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       child: Center(
                         child: Text('Apply',
                             style: tUi(15,
-                                color: AppColors.bg,
-                                weight: FontWeight.w700)),
+                                color: AppColors.bg, weight: FontWeight.w700)),
                       ),
                     ),
                   ),

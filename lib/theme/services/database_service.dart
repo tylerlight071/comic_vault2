@@ -16,7 +16,7 @@ class DatabaseService {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       join(dbPath, 'comic_vault.db'),
-      version: 7,
+      version: 8,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE comics (
@@ -40,7 +40,10 @@ class DatabaseService {
             readDate        TEXT,
             isReading       INTEGER NOT NULL DEFAULT 0,
             notes           TEXT,
-            condition       TEXT
+            condition       TEXT,
+            purchasePrice   REAL,
+            loanedTo        TEXT,
+            tags            TEXT
           )
         ''');
 
@@ -188,6 +191,11 @@ class DatabaseService {
           try { await db.execute('ALTER TABLE comics ADD COLUMN isReading INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
           try { await db.execute('ALTER TABLE comics ADD COLUMN notes TEXT'); } catch (_) {}
           try { await db.execute('ALTER TABLE comics ADD COLUMN condition TEXT'); } catch (_) {}
+        }
+        if (oldVersion < 8) {
+          try { await db.execute('ALTER TABLE comics ADD COLUMN purchasePrice REAL'); } catch (_) {}
+          try { await db.execute('ALTER TABLE comics ADD COLUMN loanedTo TEXT'); } catch (_) {}
+          try { await db.execute('ALTER TABLE comics ADD COLUMN tags TEXT'); } catch (_) {}
         }
       },
     );

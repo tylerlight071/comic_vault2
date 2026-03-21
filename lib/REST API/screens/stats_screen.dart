@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/typography.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -25,6 +26,7 @@ class _StatsScreenState extends State<StatsScreen> {
   List<Comic> _library  = [];
   List<Comic> _wishlist = [];
   bool _loading = true;
+  int  _readingGoal = 0;
 
   @override
   void initState() {
@@ -35,13 +37,90 @@ class _StatsScreenState extends State<StatsScreen> {
   Future<void> _load() async {
     final library  = await DatabaseService.instance.getAllComics();
     final wishlist = await DatabaseService.instance.getWishlist();
+    final prefs    = await SharedPreferences.getInstance();
+    final goal     = prefs.getInt('reading_goal_$_thisYear') ?? 0;
     if (mounted) {
       setState(() {
-        _library  = library;
-        _wishlist = wishlist;
-        _loading  = false;
+        _library     = library;
+        _wishlist    = wishlist;
+        _readingGoal = goal;
+        _loading     = false;
       });
     }
+  }
+
+  Future<void> _editGoal() async {
+    final ctrl = TextEditingController(
+        text: _readingGoal > 0 ? '$_readingGoal' : '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Reading Goal', style: tUi(17, weight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('How many comics do you want to read in $_thisYear?',
+                style: tUi(13,
+                    color: AppColors.textSecondary,
+                    weight: FontWeight.w400,
+                    height: 1.5)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              style: tUi(16, color: AppColors.textPrimary, weight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: '52',
+                hintStyle: tUi(16, color: AppColors.textDisabled),
+                filled: true,
+                fillColor: AppColors.surface2,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_readingGoal > 0)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, '0'),
+              child: Text('Remove Goal',
+                  style: tUi(14,
+                      color: AppColors.redDestructive.withOpacity(0.8),
+                      weight: FontWeight.w600)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: tUi(14,
+                    color: AppColors.textSecondary, weight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: Text('Save',
+                style: tUi(14,
+                    color: AppColors.textPrimary, weight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (result == null || !mounted) return;
+    final parsed = int.tryParse(result.trim()) ?? 0;
+    final prefs  = await SharedPreferences.getInstance();
+    await prefs.setInt('reading_goal_$_thisYear', parsed);
+    setState(() => _readingGoal = parsed);
   }
 
   // ── Derived stats ─────────────────────────────────────────────────────────
@@ -87,6 +166,17 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   // ── Series / publisher / etc. ──────────────────────────────────────────────
+
+  int get _loanedCount  => _library.where((c) => c.loanedTo != null).length;
+  List<Comic> get _loanedComics => _library.where((c) => c.loanedTo != null).toList();
+
+  int    get _pricedCount => _library.where((c) => c.purchasePrice != null).length;
+  double get _totalPaid   => _library.fold(0.0, (s, c) => s + (c.purchasePrice ?? 0.0));
+  double get _avgPrice {
+    final priced = _library.where((c) => c.purchasePrice != null).toList();
+    if (priced.isEmpty) return 0;
+    return priced.fold(0.0, (s, c) => s + c.purchasePrice!) / priced.length;
+  }
 
   int get _seriesCount => _library.map((c) => c.seriesName).toSet().length;
   int get _publisherCount =>
@@ -176,9 +266,21 @@ class _StatsScreenState extends State<StatsScreen> {
                     _buildSummaryGrid(),
                     const SizedBox(height: 28),
                     _buildReadingProgress(),
+                    const SizedBox(height: 28),
+                    _buildGoalSection(),
                     if (_readThisYear.isNotEmpty) ...[
                       const SizedBox(height: 28),
                       _buildThisYear(),
+                    ],
+                    if (_pricedCount > 0) ...[
+                      const SizedBox(height: 28),
+                      _buildValueSection(),
+                    ],
+                    if (_loanedComics.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _sectionLabel('LOANED OUT'),
+                      const SizedBox(height: 10),
+                      _buildLoanedSection(),
                     ],
                     const SizedBox(height: 28),
                     if (_topSeries.isNotEmpty) ...[
@@ -537,6 +639,220 @@ class _StatsScreenState extends State<StatsScreen> {
                   style: tUi(12,
                       color: AppColors.textTertiary,
                       weight: FontWeight.w600),
+                ),
+              ),
+            ]),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Reading goal ──────────────────────────────────────────────────────────
+
+  Widget _buildGoalSection() {
+    final goal  = _readingGoal;
+    final count = _readThisYear.length;
+    final pct   = goal > 0 ? (count / goal).clamp(0.0, 1.0) : 0.0;
+    final done  = goal > 0 && count >= goal;
+
+    return Pressable(
+      onTap: _editGoal,
+      haptic: HapticStyle.light,
+      scaleDown: 0.98,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: goal == 0
+            ? Row(children: [
+                const Icon(Icons.flag_outlined,
+                    color: AppColors.textTertiary, size: 18),
+                const SizedBox(width: 10),
+                Text('Set a reading goal for $_thisYear',
+                    style: tUi(14,
+                        color: AppColors.textTertiary,
+                        weight: FontWeight.w500)),
+                const Spacer(),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textDisabled, size: 16),
+              ])
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('$count',
+                          style: tDisplay(32,
+                              weight: FontWeight.w700, letterSpacing: -1.0)),
+                      const SizedBox(width: 4),
+                      Text(' / $goal',
+                          style: tUi(16,
+                              color: AppColors.textTertiary,
+                              weight: FontWeight.w400)),
+                      const SizedBox(width: 6),
+                      if (done)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.greenOwnedDim,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('Goal reached!',
+                              style: tUi(11,
+                                  color: AppColors.greenOwned,
+                                  weight: FontWeight.w700)),
+                        ),
+                      const Spacer(),
+                      Pressable(
+                        onTap: _editGoal,
+                        haptic: HapticStyle.light,
+                        child: Text('Edit',
+                            style: tUi(12,
+                                color: AppColors.textTertiary,
+                                weight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('comics read in $_thisYear  ·  goal: $goal',
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w400)),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      backgroundColor: AppColors.surface3,
+                      valueColor: AlwaysStoppedAnimation(
+                          done ? AppColors.greenOwned : AppColors.accent),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  // ── Collection value ──────────────────────────────────────────────────────
+
+  Widget _buildValueSection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('COLLECTION VALUE',
+              style: tUi(10,
+                  color: AppColors.textTertiary,
+                  weight: FontWeight.w700,
+                  letterSpacing: 1.6)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('\$${_totalPaid.toStringAsFixed(2)}',
+                      style: tDisplay(26,
+                          weight: FontWeight.w700, letterSpacing: -0.8)),
+                  const SizedBox(height: 3),
+                  Text('total paid',
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w400)),
+                ],
+              ),
+            ),
+            Container(width: 1, height: 40, color: AppColors.border),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('\$${_avgPrice.toStringAsFixed(2)}',
+                        style: tDisplay(26,
+                            weight: FontWeight.w700, letterSpacing: -0.8)),
+                    const SizedBox(height: 3),
+                    Text('avg per comic',
+                        style: tUi(12,
+                            color: AppColors.textTertiary,
+                            weight: FontWeight.w400)),
+                  ],
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Text('Based on $_pricedCount of $_total comics with a price recorded',
+              style: tUi(11,
+                  color: AppColors.textDisabled, weight: FontWeight.w400)),
+        ],
+      ),
+    );
+  }
+
+  // ── Loaned out ────────────────────────────────────────────────────────────
+
+  Widget _buildLoanedSection() {
+    final comics = _loanedComics;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: comics.asMap().entries.map((e) {
+          final i     = e.key;
+          final comic = e.value;
+          final last  = i == comics.length - 1;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              border: last
+                  ? null
+                  : Border(
+                      bottom: BorderSide(
+                          color: AppColors.border.withOpacity(0.4))),
+            ),
+            child: Row(children: [
+              const Icon(Icons.person_rounded,
+                  color: AppColors.gold, size: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(comic.loanedTo!,
+                        style: tUi(13,
+                            color: AppColors.textPrimary,
+                            weight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${comic.seriesName}'
+                      '${comic.issueNumber != null ? ' #${comic.issueNumber}' : ''}',
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w400),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             ]),

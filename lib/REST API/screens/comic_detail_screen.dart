@@ -195,6 +195,64 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     widget.onUpdated();
   }
 
+  Future<void> _openPriceEditor() async {
+    AppHaptics.light();
+    final ctrl = TextEditingController(
+        text: _comic.purchasePrice != null
+            ? _comic.purchasePrice!.toStringAsFixed(2)
+            : '');
+    final saved = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PriceBottomSheet(controller: ctrl),
+    );
+    if (saved == null || !mounted) return;
+    final parsed = double.tryParse(saved.trim());
+    final u = (saved.trim().isEmpty || parsed == null)
+        ? _comic.copyWith(clearPurchasePrice: true)
+        : _comic.copyWith(purchasePrice: parsed);
+    await DatabaseService.instance.updateComic(u);
+    setState(() => _comic = u);
+    widget.onUpdated();
+  }
+
+  Future<void> _openLoanEditor() async {
+    AppHaptics.light();
+    final ctrl = TextEditingController(text: _comic.loanedTo ?? '');
+    final saved = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _LoanBottomSheet(controller: ctrl),
+    );
+    if (saved == null || !mounted) return;
+    final u = saved.trim().isEmpty
+        ? _comic.copyWith(clearLoanedTo: true)
+        : _comic.copyWith(loanedTo: saved.trim());
+    await DatabaseService.instance.updateComic(u);
+    setState(() => _comic = u);
+    widget.onUpdated();
+  }
+
+  Future<void> _returnLoan() async {
+    AppHaptics.medium();
+    final u = _comic.copyWith(clearLoanedTo: true);
+    await DatabaseService.instance.updateComic(u);
+    setState(() => _comic = u);
+    widget.onUpdated();
+  }
+
+  Future<void> _setTags(List<String> tags) async {
+    final joined = tags.join(',');
+    final u = tags.isEmpty
+        ? _comic.copyWith(clearTags: true)
+        : _comic.copyWith(tags: joined);
+    await DatabaseService.instance.updateComic(u);
+    setState(() => _comic = u);
+    widget.onUpdated();
+  }
+
   Future<void> _delete() async {
     AppHaptics.warning();
     final ok = await showDialog<bool>(
@@ -632,6 +690,18 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
 
               if (widget.mode == ComicDetailMode.owned) ...[
                 _conditionSection(),
+                const SizedBox(height: 24),
+                Divider(color: AppColors.border.withOpacity(0.6), height: 1),
+                const SizedBox(height: 24),
+                _purchasePriceSection(),
+                const SizedBox(height: 24),
+                Divider(color: AppColors.border.withOpacity(0.6), height: 1),
+                const SizedBox(height: 24),
+                _tagsSection(),
+                const SizedBox(height: 24),
+                Divider(color: AppColors.border.withOpacity(0.6), height: 1),
+                const SizedBox(height: 24),
+                _loanSection(),
                 const SizedBox(height: 24),
                 Divider(color: AppColors.border.withOpacity(0.6), height: 1),
                 const SizedBox(height: 24),
@@ -1191,6 +1261,235 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
         ],
       ).animate().fadeIn(delay: 290.ms);
 
+  Widget _purchasePriceSection() {
+    final price = _comic.purchasePrice;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Text('PURCHASE PRICE',
+              style: tUi(10,
+                  color: AppColors.textTertiary,
+                  weight: FontWeight.w700,
+                  letterSpacing: 1.6)),
+          const Spacer(),
+          Pressable(
+            onTap: _openPriceEditor,
+            haptic: HapticStyle.light,
+            child: Text(
+              price == null ? 'Add' : 'Edit',
+              style: tUi(12, color: AppColors.textTertiary, weight: FontWeight.w600),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Pressable(
+          onTap: _openPriceEditor,
+          haptic: HapticStyle.light,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: price != null
+                ? Row(children: [
+                    const Icon(Icons.attach_money_rounded,
+                        color: AppColors.greenOwned, size: 18),
+                    const SizedBox(width: 6),
+                    Text('\$${price.toStringAsFixed(2)} paid',
+                        style: tUi(14,
+                            color: AppColors.textSecondary,
+                            weight: FontWeight.w500)),
+                  ])
+                : Text('Tap to record what you paid…',
+                    style: tUi(14,
+                        color: AppColors.textDisabled,
+                        weight: FontWeight.w400)),
+          ),
+        ),
+      ],
+    ).animate().fadeIn(delay: 285.ms);
+  }
+
+  static const _suggestedTags = [
+    'Key Issue', 'First Appearance', 'Signed', 'CGC Graded',
+    'Variant Cover', '1st Print', 'Newsstand',
+  ];
+
+  Widget _tagsSection() {
+    final currentTags = _comic.tagList;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('TAGS',
+            style: tUi(10,
+                color: AppColors.textTertiary,
+                weight: FontWeight.w700,
+                letterSpacing: 1.6)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            // Existing tags — tappable to remove
+            ...currentTags.map((tag) => Pressable(
+              onTap: () {
+                AppHaptics.light();
+                final updated = [...currentTags]..remove(tag);
+                _setTags(updated);
+              },
+              haptic: HapticStyle.none,
+              scaleDown: 0.92,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.surface3,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderFocus),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(tag,
+                      style: tUi(12,
+                          color: AppColors.textPrimary,
+                          weight: FontWeight.w600)),
+                  const SizedBox(width: 5),
+                  const Icon(Icons.close_rounded,
+                      color: AppColors.textTertiary, size: 12),
+                ]),
+              ),
+            )),
+            // Suggested tags not yet added
+            ..._suggestedTags
+                .where((t) => !currentTags.contains(t))
+                .map((tag) => Pressable(
+              onTap: () {
+                AppHaptics.light();
+                _setTags([...currentTags, tag]);
+              },
+              haptic: HapticStyle.none,
+              scaleDown: 0.92,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.add_rounded,
+                      color: AppColors.textDisabled, size: 13),
+                  const SizedBox(width: 4),
+                  Text(tag,
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w500)),
+                ]),
+              ),
+            )),
+          ],
+        ),
+      ],
+    ).animate().fadeIn(delay: 287.ms);
+  }
+
+  Widget _loanSection() {
+    final loaned = _comic.loanedTo;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('LOAN',
+            style: tUi(10,
+                color: AppColors.textTertiary,
+                weight: FontWeight.w700,
+                letterSpacing: 1.6)),
+        const SizedBox(height: 12),
+        if (loaned != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.goldDim,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gold_(0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.person_rounded, color: AppColors.gold, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Loaned out',
+                        style: tUi(10,
+                            color: AppColors.gold,
+                            weight: FontWeight.w700,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 2),
+                    Text(loaned,
+                        style: tUi(14,
+                            color: AppColors.textPrimary,
+                            weight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Pressable(
+                onTap: _returnLoan,
+                haptic: HapticStyle.medium,
+                scaleDown: 0.92,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text('Returned',
+                      style: tUi(12,
+                          color: AppColors.textSecondary,
+                          weight: FontWeight.w600)),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Pressable(
+            onTap: _openLoanEditor,
+            haptic: HapticStyle.light,
+            child: Text('Edit name',
+                style: tUi(12,
+                    color: AppColors.textTertiary, weight: FontWeight.w500)),
+          ),
+        ] else
+          Pressable(
+            onTap: _openLoanEditor,
+            haptic: HapticStyle.light,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(children: [
+                const Icon(Icons.person_add_outlined,
+                    color: AppColors.textDisabled, size: 18),
+                const SizedBox(width: 8),
+                Text('Loan out to someone…',
+                    style: tUi(14,
+                        color: AppColors.textDisabled,
+                        weight: FontWeight.w400)),
+              ]),
+            ),
+          ),
+      ],
+    ).animate().fadeIn(delay: 289.ms);
+  }
+
   Widget _creditRow(String label, String value) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1245,6 +1544,220 @@ class _CoverZoomScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Price bottom sheet ────────────────────────────────────────────────────────
+
+class _PriceBottomSheet extends StatefulWidget {
+  final TextEditingController controller;
+  const _PriceBottomSheet({required this.controller});
+
+  @override
+  State<_PriceBottomSheet> createState() => _PriceBottomSheetState();
+}
+
+class _PriceBottomSheetState extends State<_PriceBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      decoration: const BoxDecoration(
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Purchase Price', style: tUi(17, weight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('What did you pay for this comic?',
+              style: tUi(13, color: AppColors.textTertiary, weight: FontWeight.w400)),
+          const SizedBox(height: 14),
+          TextField(
+            controller: widget.controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: tUi(16, color: AppColors.textPrimary, weight: FontWeight.w500),
+            decoration: InputDecoration(
+              prefixText: '\$',
+              prefixStyle: tUi(16, color: AppColors.textTertiary, weight: FontWeight.w500),
+              hintText: '0.00',
+              hintStyle: tUi(16, color: AppColors.textDisabled),
+              filled: true,
+              fillColor: AppColors.surface2,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.borderFocus),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: Pressable(
+                onTap: () => Navigator.pop(context),
+                haptic: HapticStyle.select,
+                scaleDown: 0.97,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Center(child: Text('Cancel',
+                      style: tUi(14, color: AppColors.textSecondary, weight: FontWeight.w600))),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Pressable(
+                onTap: () => Navigator.pop(context, widget.controller.text),
+                haptic: HapticStyle.medium,
+                scaleDown: 0.97,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.textPrimary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: Text('Save',
+                      style: tUi(14, color: AppColors.bg, weight: FontWeight.w700))),
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Loan bottom sheet ─────────────────────────────────────────────────────────
+
+class _LoanBottomSheet extends StatefulWidget {
+  final TextEditingController controller;
+  const _LoanBottomSheet({required this.controller});
+
+  @override
+  State<_LoanBottomSheet> createState() => _LoanBottomSheetState();
+}
+
+class _LoanBottomSheetState extends State<_LoanBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      decoration: const BoxDecoration(
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Loan Out', style: tUi(17, weight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('Who are you loaning this to?',
+              style: tUi(13, color: AppColors.textTertiary, weight: FontWeight.w400)),
+          const SizedBox(height: 14),
+          TextField(
+            controller: widget.controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            style: tUi(14, color: AppColors.textPrimary, weight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Person\'s name…',
+              hintStyle: tUi(14, color: AppColors.textDisabled),
+              prefixIcon: const Icon(Icons.person_outlined,
+                  color: AppColors.textTertiary, size: 20),
+              filled: true,
+              fillColor: AppColors.surface2,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.borderFocus),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: Pressable(
+                onTap: () => Navigator.pop(context),
+                haptic: HapticStyle.select,
+                scaleDown: 0.97,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Center(child: Text('Cancel',
+                      style: tUi(14, color: AppColors.textSecondary, weight: FontWeight.w600))),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Pressable(
+                onTap: () => Navigator.pop(context, widget.controller.text),
+                haptic: HapticStyle.medium,
+                scaleDown: 0.97,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.textPrimary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: Text('Loan Out',
+                      style: tUi(14, color: AppColors.bg, weight: FontWeight.w700))),
+                ),
+              ),
+            ),
+          ]),
+        ],
       ),
     );
   }

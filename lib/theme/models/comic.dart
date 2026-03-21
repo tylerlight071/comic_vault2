@@ -22,6 +22,13 @@ class Comic {
   final bool isReading;          // currently in-progress
   final String? notes;           // personal notes
   final String? condition;       // physical grade: NM, VF, FN, VG, G, FR
+  final double? purchasePrice;   // what was paid
+  final String? loanedTo;        // null = in hand, non-null = loaned out
+  final String? tags;            // comma-separated: "Key Issue,Signed"
+
+  /// Parsed tag list (never null, may be empty).
+  List<String> get tagList =>
+      tags == null || tags!.trim().isEmpty ? [] : tags!.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
 
   Comic({
     this.id,
@@ -45,6 +52,9 @@ class Comic {
     this.isReading = false,
     this.notes,
     this.condition,
+    this.purchasePrice,
+    this.loanedTo,
+    this.tags,
   }) : addedDate = addedDate ?? DateTime.now();
 
   Map<String, dynamic> toMap() => {
@@ -69,6 +79,9 @@ class Comic {
         'isReading': isReading ? 1 : 0,
         'notes': notes,
         'condition': condition,
+        'purchasePrice': purchasePrice,
+        'loanedTo': loanedTo,
+        'tags': tags,
       };
 
   factory Comic.fromMap(Map<String, dynamic> map) => Comic(
@@ -95,6 +108,9 @@ class Comic {
         isReading: (map['isReading'] as int? ?? 0) == 1,
         notes: map['notes'] as String?,
         condition: map['condition'] as String?,
+        purchasePrice: map['purchasePrice'] as double?,
+        loanedTo: map['loanedTo'] as String?,
+        tags: map['tags'] as String?,
       );
 
   // clearReadDate allows explicitly setting readDate to null via copyWith
@@ -123,6 +139,12 @@ class Comic {
     bool clearNotes = false,
     String? condition,
     bool clearCondition = false,
+    double? purchasePrice,
+    bool clearPurchasePrice = false,
+    String? loanedTo,
+    bool clearLoanedTo = false,
+    String? tags,
+    bool clearTags = false,
   }) =>
       Comic(
         id: id ?? this.id,
@@ -146,5 +168,8 @@ class Comic {
         isReading: isReading ?? this.isReading,
         notes: clearNotes ? null : (notes ?? this.notes),
         condition: clearCondition ? null : (condition ?? this.condition),
+        purchasePrice: clearPurchasePrice ? null : (purchasePrice ?? this.purchasePrice),
+        loanedTo: clearLoanedTo ? null : (loanedTo ?? this.loanedTo),
+        tags: clearTags ? null : (tags ?? this.tags),
       );
 }
