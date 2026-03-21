@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Comic> _continueReading  = [];
   List<Comic> _topRated         = [];
   Comic?      _featuredComic;
-
+  String      _spotlightLabel = 'SPOTLIGHT';
   // How many comics to show in the Recently Added shelf. Enough to give a
   // meaningful snapshot without the row feeling endless.
   static const int _recentlyAddedLimit = 6;
@@ -182,13 +182,52 @@ void _warmPalette(List<Comic> comics) {
       (comics.where((c) => c.starRating > 0).toList()
         ..sort((a, b) => b.starRating.compareTo(a.starRating)));
 
-  Comic? _computeFeaturedComic(List<Comic> comics) {
-    if (comics.isEmpty) return null;
-    final candidates = comics.where((c) => c.coverImageUrl != null).toList();
-    final pool = candidates.isNotEmpty ? candidates : comics;
-    final now = DateTime.now();
-    final seed = now.year * 10000 + now.month * 100 + now.day;
-    return pool[Random(seed).nextInt(pool.length)];
+  (Comic?, String) _computeFeaturedComic(List<Comic> comics) {
+    if (comics.isEmpty) return (null, 'SPOTLIGHT');
+
+    // Priority 1: currently reading — feels personal and timely
+    final reading = comics
+        .where((c) => c.isReading && c.coverImageUrl != null)
+        .toList()
+      ..sort((a, b) => b.addedDate.compareTo(a.addedDate));
+    if (reading.isNotEmpty) return (reading.first, 'CURRENTLY READING');
+
+    // Priority 2: unread issue in a series the user rated 5 stars
+    final fiveStarSeries =
+        comics.where((c) => c.starRating == 5).map((c) => c.seriesName).toSet();
+    final fiveStarUnread = comics
+        .where((c) =>
+            !c.isRead &&
+            !c.isReading &&
+            fiveStarSeries.contains(c.seriesName) &&
+            c.coverImageUrl != null)
+        .toList();
+    if (fiveStarUnread.isNotEmpty) {
+      final seed =
+          DateTime.now().year * 10000 + DateTime.now().month * 100 + DateTime.now().day;
+      return (fiveStarUnread[Random(seed).nextInt(fiveStarUnread.length)], 'RECOMMENDED');
+    }
+
+    // Priority 3: highest-rated comic with a cover
+    final topRated = comics
+        .where((c) => c.starRating >= 4 && c.coverImageUrl != null)
+        .toList()
+      ..sort((a, b) => b.starRating.compareTo(a.starRating));
+    if (topRated.isNotEmpty) return (topRated.first, 'TOP RATED');
+
+    // Priority 4: most recently added with a cover
+    final recent = comics
+        .where((c) => c.coverImageUrl != null)
+        .toList()
+      ..sort((a, b) => b.addedDate.compareTo(a.addedDate));
+    if (recent.isNotEmpty) return (recent.first, 'JUST ADDED');
+
+    // Fallback: daily random
+    final seed =
+        DateTime.now().year * 10000 + DateTime.now().month * 100 + DateTime.now().day;
+    final pool = comics.where((c) => c.coverImageUrl != null).toList();
+    final pick = pool.isEmpty ? comics.first : pool[Random(seed).nextInt(pool.length)];
+    return (pick, 'YOUR PICK');
   }
 
   void _updateShelves(List<Comic> comics) {
@@ -196,7 +235,9 @@ void _warmPalette(List<Comic> comics) {
     _recentlyAdded    = _computeRecentlyAdded(comics);
     _continueReading  = _computeContinueReading(comics);
     _topRated         = _computeTopRated(comics);
-    _featuredComic    = _computeFeaturedComic(comics);
+    final (comic, label) = _computeFeaturedComic(comics);
+    _featuredComic  = comic;
+    _spotlightLabel = label;
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -485,6 +526,7 @@ void _warmPalette(List<Comic> comics) {
   Widget _buildLayout() {
     final cb = _LayoutCallbacks(
       onComicTap: _openComic,
+
       onScanTap: _openScanner,
       onSearchTap: _openSearch,
       onMenuTap: _openDrawer,
@@ -499,6 +541,8 @@ void _warmPalette(List<Comic> comics) {
             continueReading: _continueReading,
             topRated: _topRated,
             featuredComic: _featuredComic,
+            spotlightLabel: _spotlightLabel,
+
             shelves: _shelves,
             cb: cb);
       case HomeLayout.shelves:
@@ -508,6 +552,7 @@ void _warmPalette(List<Comic> comics) {
             recentlyAdded: _recentlyAdded,
             continueReading: _continueReading,
             topRated: _topRated,
+
             shelves: _shelves,
             cb: cb);
       case HomeLayout.mosaic:
@@ -517,6 +562,7 @@ void _warmPalette(List<Comic> comics) {
             recentlyAdded: _recentlyAdded,
             continueReading: _continueReading,
             topRated: _topRated,
+
             shelves: _shelves,
             cb: cb);
     }
@@ -539,6 +585,7 @@ void _warmPalette(List<Comic> comics) {
 
 class _LayoutCallbacks {
   final void Function(Comic) onComicTap;
+
   final VoidCallback onScanTap;
   final VoidCallback onSearchTap;
   final VoidCallback onMenuTap;

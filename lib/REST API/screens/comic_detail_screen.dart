@@ -18,6 +18,7 @@ import '../../theme/models/comic.dart';
 import '../../theme/services/database_service.dart';
 import '../../theme/services/comic_vine_service.dart';
 import '../../theme/services/cover_palette_service.dart';
+import '../../theme/services/app_settings.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 import '../../../widgets/star_rating_widget.dart';
@@ -1290,16 +1291,23 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.surface1,
+              color: AppColors.surface2,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
             ),
             child: price != null
                 ? Row(children: [
-                    const Icon(Icons.attach_money_rounded,
-                        color: AppColors.greenOwned, size: 18),
+                    Text(AppSettings.instance.currencySymbol,
+                        style: tUi(15,
+                            color: AppColors.greenOwned,
+                            weight: FontWeight.w700)),
+                    const SizedBox(width: 4),
+                    Text(price.toStringAsFixed(2),
+                        style: tUi(14,
+                            color: AppColors.textSecondary,
+                            weight: FontWeight.w500)),
                     const SizedBox(width: 6),
-                    Text('\$${price.toStringAsFixed(2)} paid',
+                    Text('paid',
                         style: tUi(14,
                             color: AppColors.textSecondary,
                             weight: FontWeight.w500)),
@@ -1375,17 +1383,17 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: AppColors.surface1,
+                  color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.add_rounded,
-                      color: AppColors.textDisabled, size: 13),
+                  Icon(Icons.add_rounded,
+                      color: AppColors.textSecondary, size: 13),
                   const SizedBox(width: 4),
                   Text(tag,
                       style: tUi(12,
-                          color: AppColors.textTertiary,
+                          color: AppColors.textSecondary,
                           weight: FontWeight.w500)),
                 ]),
               ),
@@ -1471,13 +1479,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surface1,
+                color: AppColors.surface2,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: Colors.white.withOpacity(0.18)),
               ),
               child: Row(children: [
-                const Icon(Icons.person_add_outlined,
-                    color: AppColors.textDisabled, size: 18),
+                Icon(Icons.person_add_outlined,
+                    color: AppColors.textSecondary, size: 18),
                 const SizedBox(width: 8),
                 Text('Loan out to someone…',
                     style: tUi(14,
@@ -1592,23 +1600,23 @@ class _PriceBottomSheetState extends State<_PriceBottomSheet> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: tUi(16, color: AppColors.textPrimary, weight: FontWeight.w500),
             decoration: InputDecoration(
-              prefixText: '\$',
-              prefixStyle: tUi(16, color: AppColors.textTertiary, weight: FontWeight.w500),
               hintText: '0.00',
-              hintStyle: tUi(16, color: AppColors.textDisabled),
+              hintStyle: tUi(16, color: AppColors.textTertiary),
+              helperText: 'Enter amount in your local currency',
+              helperStyle: tUi(11, color: AppColors.textTertiary),
               filled: true,
-              fillColor: AppColors.surface2,
+              fillColor: AppColors.surface3,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderFocus),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.45)),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
@@ -1700,22 +1708,22 @@ class _LoanBottomSheetState extends State<_LoanBottomSheet> {
             style: tUi(14, color: AppColors.textPrimary, weight: FontWeight.w400),
             decoration: InputDecoration(
               hintText: 'Person\'s name…',
-              hintStyle: tUi(14, color: AppColors.textDisabled),
+              hintStyle: tUi(14, color: AppColors.textTertiary),
               prefixIcon: const Icon(Icons.person_outlined,
-                  color: AppColors.textTertiary, size: 20),
+                  color: AppColors.textSecondary, size: 20),
               filled: true,
-              fillColor: AppColors.surface2,
+              fillColor: AppColors.surface3,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderFocus),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.45)),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),

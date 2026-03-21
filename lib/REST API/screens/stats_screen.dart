@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../theme/services/app_settings.dart';
 import '../../theme/typography.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -75,16 +76,16 @@ class _StatsScreenState extends State<StatsScreen> {
               style: tUi(16, color: AppColors.textPrimary, weight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: '52',
-                hintStyle: tUi(16, color: AppColors.textDisabled),
+                hintStyle: tUi(16, color: AppColors.textTertiary),
                 filled: true,
-                fillColor: AppColors.surface2,
+                fillColor: AppColors.surface3,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
@@ -167,7 +168,6 @@ class _StatsScreenState extends State<StatsScreen> {
 
   // ── Series / publisher / etc. ──────────────────────────────────────────────
 
-  int get _loanedCount  => _library.where((c) => c.loanedTo != null).length;
   List<Comic> get _loanedComics => _library.where((c) => c.loanedTo != null).toList();
 
   int    get _pricedCount => _library.where((c) => c.purchasePrice != null).length;
@@ -766,7 +766,7 @@ class _StatsScreenState extends State<StatsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('\$${_totalPaid.toStringAsFixed(2)}',
+                  Text('${AppSettings.instance.currencySymbol}${_totalPaid.toStringAsFixed(2)}',
                       style: tDisplay(26,
                           weight: FontWeight.w700, letterSpacing: -0.8)),
                   const SizedBox(height: 3),
@@ -784,7 +784,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('\$${_avgPrice.toStringAsFixed(2)}',
+                    Text('${AppSettings.instance.currencySymbol}${_avgPrice.toStringAsFixed(2)}',
                         style: tDisplay(26,
                             weight: FontWeight.w700, letterSpacing: -0.8)),
                     const SizedBox(height: 3),

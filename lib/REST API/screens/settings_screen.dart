@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/models/home_layout.dart';
 import '../../theme/models/comic.dart';
 import '../../theme/models/shelf_config.dart';
+import '../../theme/services/app_settings.dart';
 import '../../theme/typography.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -47,7 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool   _exporting    = false;
   bool   _importing    = false;
   late   HomeLayout _layout;
-  String _appVersion   = '';
+  String _appVersion      = '';
+  String _currencySymbol  = AppSettings.instance.currencySymbol;
 
   ShelfConfig _shelves = const ShelfConfig();
 
@@ -102,6 +104,183 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
+
+  static const _commonCurrencies = [
+    ('\$',  'USD / CAD / AUD'),
+    ('€',  'Euro'),
+    ('£',  'GBP'),
+    ('¥',  'JPY / CNY'),
+    ('₹',  'INR'),
+    ('₩',  'KRW'),
+    ('kr', 'SEK / NOK / DKK'),
+    ('R',  'ZAR'),
+    ('₣',  'CHF'),
+  ];
+
+  Future<void> _openCurrencyPicker() async {
+    AppHaptics.select();
+    final customCtrl = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.bgElevated,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.fromLTRB(
+                20, 20, 20, 20 + MediaQuery.of(ctx).padding.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('Currency Symbol',
+                    style: tUi(17, weight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(
+                  'Shown next to prices throughout the app.',
+                  style: tUi(13,
+                      color: AppColors.textTertiary,
+                      weight: FontWeight.w400),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _commonCurrencies.map((entry) {
+                    final symbol   = entry.$1;
+                    final sublabel = entry.$2;
+                    final selected = _currencySymbol == symbol;
+                    return Pressable(
+                      onTap: () async {
+                        await AppSettings.instance.setCurrencySymbol(symbol);
+                        setSheet(() {});
+                        if (mounted) setState(() => _currencySymbol = symbol);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      haptic: HapticStyle.light,
+                      scaleDown: 0.93,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.surface3
+                              : AppColors.surface2,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? Colors.white.withOpacity(0.35)
+                                : Colors.white.withOpacity(0.12),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(symbol,
+                                style: tDisplay(18,
+                                    weight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(sublabel,
+                                style: tUi(9,
+                                    color: AppColors.textTertiary,
+                                    weight: FontWeight.w400)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 18),
+                Text('CUSTOM',
+                    style: tUi(10,
+                        color: AppColors.textTertiary,
+                        weight: FontWeight.w700,
+                        letterSpacing: 1.4)),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: customCtrl,
+                      style: tUi(15,
+                          color: AppColors.textPrimary,
+                          weight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. R\$, zł, ฿',
+                        hintStyle: tUi(14,
+                            color: AppColors.textTertiary),
+                        filled: true,
+                        fillColor: AppColors.surface3,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: Colors.white.withOpacity(0.22)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: Colors.white.withOpacity(0.22)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: Colors.white.withOpacity(0.45)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Pressable(
+                    onTap: () async {
+                      final v = customCtrl.text.trim();
+                      if (v.isEmpty) return;
+                      await AppSettings.instance.setCurrencySymbol(v);
+                      if (mounted) setState(() => _currencySymbol = v);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    haptic: HapticStyle.medium,
+                    scaleDown: 0.95,
+                    child: Container(
+                      height: 50,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: AppColors.textPrimary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text('Use',
+                            style: tUi(14,
+                                color: AppColors.bg,
+                                weight: FontWeight.w700)),
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _startRefresh() async {
     final ok = await _confirmDialog(
@@ -373,6 +552,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 28),
 
+                  // ── Currency ─────────────────────────────────────────────
+                  _sectionLabel('CURRENCY'),
+                  const SizedBox(height: 10),
+                  _currencyTile(),
+
+                  const SizedBox(height: 28),
+
                   // ── API ──────────────────────────────────────────────────
                   _sectionLabel('API'),
                   const SizedBox(height: 10),
@@ -519,6 +705,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  // ── Currency tile ─────────────────────────────────────────────────────────
+
+  Widget _currencyTile() => Pressable(
+        onTap: _openCurrencyPicker,
+        haptic: HapticStyle.none,
+        scaleDown: 0.98,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Center(
+                child: Text(_currencySymbol,
+                    style: tDisplay(15, weight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Currency Symbol',
+                      style: tUi(14,
+                          color: AppColors.textPrimary,
+                          weight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text('Used when displaying prices.',
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w400,
+                          height: 1.4)),
+                ],
+              ),
+            ),
+            Text(_currencySymbol,
+                style: tUi(15,
+                    color: AppColors.textSecondary,
+                    weight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textDisabled, size: 18),
+          ]),
+        ),
+      );
 
   // ── API key tile ──────────────────────────────────────────────────────────
 

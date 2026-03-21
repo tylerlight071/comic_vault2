@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'theme/app_colors.dart';
 import 'theme/services/database_service.dart';
 import 'theme/services/cover_palette_service.dart';
+import 'theme/services/app_settings.dart';
 import 'REST API/screens/splash_screen.dart';
 
 void main() async {
@@ -22,6 +23,7 @@ void main() async {
   await Future.wait([
     DatabaseService.instance.init(),
     CoverPaletteService.instance.init(),
+    AppSettings.instance.init(),
   ]);
 
   runApp(const ComicVaultApp());

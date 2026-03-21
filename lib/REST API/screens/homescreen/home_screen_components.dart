@@ -42,8 +42,6 @@ extension _ShelfTypeStyle on _ShelfType {
       case _ShelfType.topRated:        return 195;
     }
   }
-
-
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -15,6 +15,8 @@ class _FeaturedLayout extends StatelessWidget {
   final List<Comic> continueReading;
   final List<Comic> topRated;
   final Comic? featuredComic;
+  final String spotlightLabel;
+
   final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
@@ -25,6 +27,7 @@ class _FeaturedLayout extends StatelessWidget {
     required this.continueReading,
     required this.topRated,
     required this.featuredComic,
+    required this.spotlightLabel,
     required this.shelves,
     required this.cb,
   });
@@ -53,6 +56,7 @@ class _FeaturedLayout extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(18, 24, 18, 0),
                 child: _FeaturedHero(
                   comic: featuredComic!,
+                  label: spotlightLabel,
                   onTap: () {
                     AppHaptics.light();
                     cb.onComicTap(featuredComic!);
@@ -129,8 +133,9 @@ class _FeaturedLayout extends StatelessWidget {
 
 class _FeaturedHero extends StatefulWidget {
   final Comic comic;
+  final String label;
   final VoidCallback onTap;
-  const _FeaturedHero({required this.comic, required this.onTap});
+  const _FeaturedHero({required this.comic, required this.label, required this.onTap});
 
   @override
   State<_FeaturedHero> createState() => _FeaturedHeroState();
@@ -264,7 +269,7 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
                         border: Border.all(
                             color: Colors.white.withOpacity(0.08)),
                       ),
-                      child: Text('SPOTLIGHT',
+                      child: Text(widget.label,
                           style: tUi(9,
                               color: Colors.white.withOpacity(0.5),
                               weight: FontWeight.w800,
@@ -348,6 +353,7 @@ class _ShelvesLayout extends StatelessWidget {
   final List<Comic> recentlyAdded;
   final List<Comic> continueReading;
   final List<Comic> topRated;
+
   final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
@@ -451,6 +457,7 @@ class _MosaicLayout extends StatelessWidget {
   final List<Comic> recentlyAdded;
   final List<Comic> continueReading;
   final List<Comic> topRated;
+
   final ShelfConfig shelves;
   final _LayoutCallbacks cb;
 
