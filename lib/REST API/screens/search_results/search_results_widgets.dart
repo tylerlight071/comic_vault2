@@ -119,7 +119,7 @@ class _ResultCardState extends State<_ResultCard> {
                         begin: Alignment.centerRight,
                         end: Alignment.centerLeft,
                         colors: [
-                          _palette.withOpacity(0.85),
+                          _palette.withValues(alpha: 0.85),
                           Colors.transparent,
                         ],
                       ),

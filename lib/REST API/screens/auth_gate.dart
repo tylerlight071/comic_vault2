@@ -35,7 +35,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   bool _locked        = true;
   bool _authenticating = false;
-  bool _deviceSupported = true; // assume supported until we know otherwise
   DateTime? _backgroundedAt;
 
   @override
@@ -80,7 +79,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       final supported = await _auth.isDeviceSupported();
       if (!supported) {
         // No lock screen configured — unlock silently.
-        if (mounted) setState(() { _locked = false; _deviceSupported = false; });
+        if (mounted) setState(() { _locked = false; });
         return;
       }
 

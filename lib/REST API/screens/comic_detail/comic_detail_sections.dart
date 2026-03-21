@@ -179,7 +179,7 @@ class _PurchasePriceSection extends StatelessWidget {
                 color: AppColors.surface2,
                 borderRadius: BorderRadius.circular(12),
                 border:
-                    Border.all(color: Colors.white.withOpacity(0.18)),
+                    Border.all(color: Colors.white.withValues(alpha: 0.18)),
               ),
               child: purchasePrice != null
                   ? Row(children: [
@@ -281,7 +281,7 @@ class _TagsSection extends StatelessWidget {
                     color: AppColors.surface2,
                     borderRadius: BorderRadius.circular(20),
                     border:
-                        Border.all(color: Colors.white.withOpacity(0.18)),
+                        Border.all(color: Colors.white.withValues(alpha: 0.18)),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.add_rounded,
@@ -393,7 +393,7 @@ class _LoanSection extends StatelessWidget {
                   color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(12),
                   border:
-                      Border.all(color: Colors.white.withOpacity(0.18)),
+                      Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Row(children: [
                   Icon(Icons.person_add_outlined,

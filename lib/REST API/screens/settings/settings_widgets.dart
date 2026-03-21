@@ -53,7 +53,7 @@ class _ActionTile extends StatelessWidget {
               color: iconBg,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                  color: borderColor?.withOpacity(0.4) ?? AppColors.border),
+                  color: borderColor?.withValues(alpha: 0.4) ?? AppColors.border),
             ),
             child: Icon(icon, color: iconColor, size: 18),
           ),

@@ -1,7 +1,6 @@
 // lib/theme/services/comic_vine_service.dart
 
 import 'dart:convert';
-import 'dart:math' show sqrt;
 import 'package:flutter/foundation.dart' show compute, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';

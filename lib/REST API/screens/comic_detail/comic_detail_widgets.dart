@@ -90,15 +90,15 @@ class _PriceBottomSheetState extends State<_PriceBottomSheet> {
               fillColor: AppColors.surface3,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.45)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
@@ -197,15 +197,15 @@ class _LoanBottomSheetState extends State<_LoanBottomSheet> {
               fillColor: AppColors.surface3,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.22)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.45)),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
