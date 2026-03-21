@@ -101,7 +101,7 @@ class Comic {
         isRead: (map['isRead'] as int? ?? 0) == 1,
         starRating: map['starRating'] as int? ?? 0,
         isWishlisted: (map['isWishlisted'] as int? ?? 0) == 1,
-        addedDate: DateTime.parse(map['addedDate'] as String),
+        addedDate: DateTime.tryParse(map['addedDate'] as String) ?? DateTime.now(),
         readDate: map['readDate'] != null
             ? DateTime.tryParse(map['readDate'] as String)
             : null,

@@ -49,13 +49,14 @@ class _ScannerScreenState extends State<ScannerScreen>
 
   void _onDetect(BarcodeCapture capture) {
     if (_scanned) return;
+    _scanned = true; // Guard immediately — prevents re-entrancy before setState runs
+
     final raw = capture.barcodes.firstOrNull?.rawValue;
-    if (raw == null || raw.isEmpty) return;
-    
+    if (raw == null || raw.isEmpty) { _scanned = false; return; }
+
     final validated = _validateAndNormalizeBarcode(raw);
-    if (validated == null) return; // Invalid barcode
-    
-    setState(() => _scanned = true);
+    if (validated == null) { _scanned = false; return; } // Invalid — keep scanning
+
     Navigator.pop(context, validated);
   }
 

@@ -2,9 +2,8 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
-
 import 'package:encrypt/encrypt.dart';
+import 'package:flutter/foundation.dart' hide Key;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// AES-256-CBC field-level encryption for sensitive database columns.
@@ -63,8 +62,9 @@ class EncryptionService {
       final iv        = IV(Uint8List.fromList(combined.sublist(0, 16)));
       final encrypted = Encrypted(Uint8List.fromList(combined.sublist(16)));
       return _encrypter!.decrypt(encrypted, iv: iv);
-    } catch (_) {
-      return value; // Graceful degradation — never crash on a bad decrypt
+    } catch (e, st) {
+      debugPrint('[EncryptionService] decrypt failed: $e\n$st');
+      return null; // Return null rather than leaking the raw ciphertext
     }
   }
 

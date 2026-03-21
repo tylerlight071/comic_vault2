@@ -2,6 +2,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/comic.dart';
@@ -298,15 +299,18 @@ class DatabaseService {
 
       await backup.delete().catchError((_) => backup);
       await EncryptionService.secureWrite(flagKey, '1');
-    } catch (_) {
+    } catch (e) {
       // Migration failed — restore the original file so data is preserved.
       // The app continues with the unencrypted DB; field-level encryption
       // (notes, loanedTo) still protects the most sensitive columns.
+      debugPrint('[DB] SQLCipher migration failed: $e — restoring backup');
       if (await backup.exists()) {
         try {
           if (await file.exists()) await file.delete();
           await backup.rename(path);
-        } catch (_) {}
+        } catch (restoreErr) {
+          debugPrint('[DB] Backup restore also failed: $restoreErr');
+        }
       }
       // Leave the flag unset so we retry on the next launch.
     }
@@ -347,7 +351,9 @@ class DatabaseService {
         'artists': comic.artists ?? '',
         'barcode': comic.barcode ?? '',
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[DB] FTS insert failed for comic $id: $e');
+    }
     return id;
   }
 
@@ -375,19 +381,27 @@ class DatabaseService {
         'artists': comic.artists ?? '',
         'barcode': comic.barcode ?? '',
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[DB] FTS update failed for comic ${comic.id}: $e');
+    }
   }
 
   Future<void> deleteComic(int id) async {
     await _database.delete('comics', where: 'id = ?', whereArgs: [id]);
     try {
       await _database.delete('comics_fts', where: 'rowid = ?', whereArgs: [id]);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[DB] FTS delete failed for comic $id: $e');
+    }
   }
 
   Future<void> deleteAllComics() async {
     await _database.delete('comics');
-    try { await _database.delete('comics_fts'); } catch (_) {}
+    try {
+      await _database.delete('comics_fts');
+    } catch (e) {
+      debugPrint('[DB] FTS clear failed: $e');
+    }
   }
 
   Future<bool> comicExists(String comicVineId) async {
@@ -545,7 +559,9 @@ class DatabaseService {
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             });
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[DB] Refresh failed for $comicVineId: $e');
+        }
         onProgress?.call(++done, total);
       }));
 
@@ -557,6 +573,39 @@ class DatabaseService {
   }
 
   // ── Local Search ──────────────────────────────────────────────────────────
+
+  /// Appends optional filter clauses to [conditions] and their bind values to
+  /// [args]. Extracted to avoid duplicating the same logic across the FTS path
+  /// and the LIKE fallback path inside [searchComics].
+  static void _applySearchFilters(
+    List<String> conditions,
+    List<dynamic> args, {
+    required bool includeWishlist,
+    required int? minRating,
+    required bool? isRead,
+    required String? publisher,
+    required int? publicationYear,
+  }) {
+    if (!includeWishlist) {
+      conditions.add('isWishlisted = 0');
+    }
+    if (minRating != null) {
+      conditions.add('starRating >= ?');
+      args.add(minRating);
+    }
+    if (isRead != null) {
+      conditions.add('isRead = ?');
+      args.add(isRead ? 1 : 0);
+    }
+    if (publisher != null && publisher.isNotEmpty) {
+      conditions.add('publisher LIKE ?');
+      args.add('%$publisher%');
+    }
+    if (publicationYear != null) {
+      conditions.add('publicationYear = ?');
+      args.add(publicationYear);
+    }
+  }
 
   Future<List<Comic>> searchComics(String query, {
     bool includeWishlist = true,
@@ -599,17 +648,12 @@ class DatabaseService {
         final whereConditions = <String>['id IN ($placeholders)'];
         final whereArgs = <dynamic>[...ids];
 
-        if (!includeWishlist) { whereConditions.add('isWishlisted = 0'); }
-        if (minRating != null) { whereConditions.add('starRating >= ?'); whereArgs.add(minRating); }
-        if (isRead != null)    { whereConditions.add('isRead = ?'); whereArgs.add(isRead ? 1 : 0); }
-        if (publisher != null && publisher.isNotEmpty) {
-          whereConditions.add('publisher LIKE ?');
-          whereArgs.add('%$publisher%');
-        }
-        if (publicationYear != null) {
-          whereConditions.add('publicationYear = ?');
-          whereArgs.add(publicationYear);
-        }
+        _applySearchFilters(whereConditions, whereArgs,
+            includeWishlist: includeWishlist,
+            minRating: minRating,
+            isRead: isRead,
+            publisher: publisher,
+            publicationYear: publicationYear);
 
         rows = await _database.query(
           'comics',
@@ -629,17 +673,12 @@ class DatabaseService {
       whereConditions.add('(${likeConditions.join(' OR ')})');
       whereArgs.addAll(List.filled(searchFields.length, '%$trimmedQuery%'));
 
-      if (!includeWishlist) { whereConditions.add('isWishlisted = 0'); }
-      if (minRating != null) { whereConditions.add('starRating >= ?'); whereArgs.add(minRating); }
-      if (isRead != null)    { whereConditions.add('isRead = ?'); whereArgs.add(isRead ? 1 : 0); }
-      if (publisher != null && publisher.isNotEmpty) {
-        whereConditions.add('publisher LIKE ?');
-        whereArgs.add('%$publisher%');
-      }
-      if (publicationYear != null) {
-        whereConditions.add('publicationYear = ?');
-        whereArgs.add(publicationYear);
-      }
+      _applySearchFilters(whereConditions, whereArgs,
+          includeWishlist: includeWishlist,
+          minRating: minRating,
+          isRead: isRead,
+          publisher: publisher,
+          publicationYear: publicationYear);
 
       rows = await _database.query(
         'comics',

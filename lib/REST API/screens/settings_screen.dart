@@ -23,6 +23,8 @@ import '../../theme/services/database_service.dart';
 import '../../theme/utils/haptics.dart';
 import '../../../widgets/pressable.dart';
 
+part 'settings_widgets.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsScreen extends StatefulWidget {
@@ -444,7 +446,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             await DatabaseService.instance.insertComic(comic);
             imported++;
           }
-        } catch (_) { skipped++; }
+        } catch (e) { debugPrint('[Settings] Skipping comic during import: $e'); skipped++; }
       }
       widget.onDataChanged();
       final msg = skipped > 0
@@ -594,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 10),
                   _refreshTile(),
                   const SizedBox(height: 1),
-                  _actionTile(
+                  _ActionTile(
                     icon: Icons.history_rounded,
                     iconBg: AppColors.surface2,
                     iconColor: AppColors.textSecondary,
@@ -605,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     isLast: false,
                   ),
                   const SizedBox(height: 1),
-                  _actionTile(
+                  _ActionTile(
                     icon: Icons.qr_code_scanner_rounded,
                     iconBg: AppColors.surface2,
                     iconColor: AppColors.textSecondary,
@@ -617,7 +619,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 1),
                   const SizedBox(height: 1),
-                  _actionTile(
+                  _ActionTile(
                     icon: Icons.upload_rounded,
                     iconBg: AppColors.accentDim,
                     iconColor: AppColors.accent,
@@ -628,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     isLast: false,
                   ),
                   const SizedBox(height: 1),
-                  _actionTile(
+                  _ActionTile(
                     icon: Icons.download_rounded,
                     iconBg: AppColors.greenOwnedDim,
                     iconColor: AppColors.greenOwned,
@@ -639,7 +641,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     isLast: false,
                   ),
                   const SizedBox(height: 1),
-                  _actionTile(
+                  _ActionTile(
                     icon: Icons.delete_forever_rounded,
                     iconBg: AppColors.redDestructive.withOpacity(0.08),
                     iconColor: AppColors.redDestructive,
@@ -1114,74 +1116,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-  // ── Generic action tile ───────────────────────────────────────────────────
-
-  Widget _actionTile({
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required String label,
-    required String description,
-    required VoidCallback onTap,
-    Color? labelColor,
-    Color? borderColor,
-    bool isFirst = false,
-    bool isLast = false,
-  }) {
-    BorderRadius radius = BorderRadius.zero;
-    if (isFirst && isLast) radius = BorderRadius.circular(14);
-    else if (isFirst) radius = const BorderRadius.vertical(top: Radius.circular(14));
-    else if (isLast)  radius = const BorderRadius.vertical(bottom: Radius.circular(14));
-
-    return Pressable(
-      onTap: onTap,
-      haptic: HapticStyle.none,
-      scaleDown: 0.98,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: radius,
-          border: Border.all(
-              color: borderColor ?? AppColors.border),
-        ),
-        child: Row(children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: borderColor?.withOpacity(0.4) ??
-                      AppColors.border),
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: tUi(14,
-                        color: labelColor ?? AppColors.textPrimary,
-                        weight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(description,
-                    style: tUi(12,
-                        color: AppColors.textTertiary,
-                        weight: FontWeight.w400,
-                        height: 1.4)),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded,
-              color: AppColors.textDisabled, size: 18),
-        ]),
-      ),
-    );
-  }
-
   // ── About info group ──────────────────────────────────────────────────────
 
   Widget _infoGroup(List<_InfoRow> rows) {
@@ -1222,12 +1156,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-}
-
-// ── Info row model ────────────────────────────────────────────────────────────
-
-class _InfoRow {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
 }

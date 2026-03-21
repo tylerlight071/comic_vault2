@@ -7,7 +7,12 @@
       "Bash(flutter pub:*)",
       "Read(//c/Users/tyler/AppData/Local/Pub/Cache/hosted/pub.dev/sqflite_sqlcipher-3.3.0/**)",
       "Read(//c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/$HOME/AppData/Local/Pub/Cache/hosted/pub.dev/**)",
-      "Bash(grep -r \"rekey\\\\|password\\\\|PRAGMA\" c:/Users/tyler/AppData/Local/Pub/Cache/hosted/pub.dev/sqflite_sqlcipher-3.3.0/ --include=*.kt --include=*.java -l)"
+      "Bash(grep -r \"rekey\\\\|password\\\\|PRAGMA\" c:/Users/tyler/AppData/Local/Pub/Cache/hosted/pub.dev/sqflite_sqlcipher-3.3.0/ --include=*.kt --include=*.java -l)",
+      "Bash(find /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib -name \"*.dart\" -type f -exec wc -l {} +)",
+      "Bash(xargs wc:*)",
+      "Bash(xargs -0 wc -l)",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|HACK\\\\|XXX\\\\|TEMP\\\\|DEPRECATED\" /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib --include=*.dart)",
+      "Read(//tmp/**)"
     ]
   }
 }

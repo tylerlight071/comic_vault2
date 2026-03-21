@@ -144,12 +144,9 @@ void _warmPalette(List<Comic> comics) {
       .take(warmCount)
       .map((c) => c.coverImageUrl!)
       .toList();
- 
-  for (var i = 0; i < urls.length; i++) {
-    Future.delayed(Duration(milliseconds: i * 20), () {
-      if (mounted) CoverPaletteService.instance.getColor(urls[i]);
-    });
-  }
+  // Fire all requests concurrently — CoverPaletteService deduplicates
+  // in-flight requests so there is no risk of redundant network calls.
+  Future.wait(urls.map(CoverPaletteService.instance.getColor));
 }
 
   // ── Shelf data helpers ────────────────────────────────────────────────────

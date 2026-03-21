@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'dart:math' show sqrt;
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show compute, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/comic.dart';
@@ -301,7 +301,9 @@ class ComicVineService {
         final brand = item['brand'] as String?;
         if (title != null) return brand != null ? '$title $brand' : title;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ComicVine] UPC lookup failed: $e');
+    }
     return null;
   }
 
@@ -401,7 +403,8 @@ class ComicVineService {
       final result = body['results'] as Map<String, dynamic>?;
       if (result == null) return null;
       return _parseIssue(result);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ComicVine] fetchIssueById failed: $e');
       return null;
     }
   }
