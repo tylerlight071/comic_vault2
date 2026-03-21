@@ -13,6 +13,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/models/comic.dart';
 import '../../theme/services/database_service.dart';
 import '../../../widgets/pressable.dart';
+import '../../../widgets/section_label.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -278,31 +279,31 @@ class _StatsScreenState extends State<StatsScreen> {
                     ],
                     if (_loanedComics.isNotEmpty) ...[
                       const SizedBox(height: 28),
-                      _sectionLabel('LOANED OUT'),
+                      SectionLabel('LOANED OUT'),
                       const SizedBox(height: 10),
                       _buildLoanedSection(),
                     ],
                     const SizedBox(height: 28),
                     if (_topSeries.isNotEmpty) ...[
-                      _sectionLabel('TOP SERIES'),
+                      SectionLabel('TOP SERIES'),
                       const SizedBox(height: 10),
                       _buildBarChart(_topSeries, barColor: AppColors.gold),
                       const SizedBox(height: 28),
                     ],
                     if (_topPublishers.isNotEmpty) ...[
-                      _sectionLabel('PUBLISHERS'),
+                      SectionLabel('PUBLISHERS'),
                       const SizedBox(height: 10),
                       _buildBarChart(_topPublishers, barColor: AppColors.accent),
                       const SizedBox(height: 28),
                     ],
                     if (_byDecade.isNotEmpty) ...[
-                      _sectionLabel('BY DECADE'),
+                      SectionLabel('BY DECADE'),
                       const SizedBox(height: 10),
                       _buildBarChart(_byDecade, barColor: AppColors.greenOwned),
                       const SizedBox(height: 28),
                     ],
                     if (_byCondition.isNotEmpty) ...[
-                      _sectionLabel('CONDITION'),
+                      SectionLabel('CONDITION'),
                       const SizedBox(height: 10),
                       _buildBarChart(_byCondition, barColor: AppColors.redDestructive),
                     ],
@@ -496,7 +497,7 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
           if (byMonth.isNotEmpty) ...[
             const SizedBox(height: 14),
-            _sectionLabel('BY MONTH'),
+            SectionLabel('BY MONTH'),
             const SizedBox(height: 10),
             _buildInlineBarChart(byMonth, barColor: AppColors.accent),
           ],
@@ -863,15 +864,6 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   // ── Section label ─────────────────────────────────────────────────────────
-
-  Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(text,
-            style: tUi(10,
-                color: AppColors.textTertiary,
-                weight: FontWeight.w700,
-                letterSpacing: 1.6)),
-      );
 
   // ── Empty state ───────────────────────────────────────────────────────────
 

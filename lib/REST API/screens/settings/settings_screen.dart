@@ -22,6 +22,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/services/database_service.dart';
 import '../../../theme/utils/haptics.dart';
 import '../../../../widgets/pressable.dart';
+import '../../../../widgets/section_label.dart';
 
 part 'settings_widgets.dart';
 
@@ -564,35 +565,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
 
                   // ── Home Layout ─────────────────────────────────────────
-                  _sectionLabel('HOME LAYOUT'),
+                  SectionLabel('HOME LAYOUT'),
                   const SizedBox(height: 10),
                   _layoutPicker(),
 
                   const SizedBox(height: 28),
 
                   // ── Shelves ──────────────────────────────────────────────
-                  _sectionLabel('HOME SHELVES'),
+                  SectionLabel('HOME SHELVES'),
                   const SizedBox(height: 10),
                   _shelvesConfig(),
 
                   const SizedBox(height: 28),
 
                   // ── Currency ─────────────────────────────────────────────
-                  _sectionLabel('CURRENCY'),
+                  SectionLabel('CURRENCY'),
                   const SizedBox(height: 10),
                   _currencyTile(),
 
                   const SizedBox(height: 28),
 
                   // ── API ──────────────────────────────────────────────────
-                  _sectionLabel('API'),
+                  SectionLabel('API'),
                   const SizedBox(height: 10),
                   _apiKeyTile(),
 
                   const SizedBox(height: 28),
 
                   // ── Data ────────────────────────────────────────────────
-                  _sectionLabel('DATA'),
+                  SectionLabel('DATA'),
                   const SizedBox(height: 10),
                   _refreshTile(),
                   const SizedBox(height: 1),
@@ -658,7 +659,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 28),
 
                   // ── About ────────────────────────────────────────────────
-                  _sectionLabel('ABOUT'),
+                  SectionLabel('ABOUT'),
                   const SizedBox(height: 10),
                   _infoGroup([
                     _InfoRow(label: 'Metadata', value: 'Comic Vine API'),
@@ -928,15 +929,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
   // ── Section label ─────────────────────────────────────────────────────────
-
-  Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(text,
-            style: tUi(10,
-                color: AppColors.textTertiary,
-                weight: FontWeight.w700,
-                letterSpacing: 1.6)),
-      );
 
   // ── Layout picker ─────────────────────────────────────────────────────────
 
