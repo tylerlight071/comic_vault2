@@ -9,7 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../theme/typography.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../theme/services/encryption_service.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
 
@@ -1115,38 +1115,44 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
       'wrongComicLabel': comicLabel,
     };
 
-    // Always persist locally
-    final prefs = await SharedPreferences.getInstance();
-    final log = prefs.getStringList('barcode_mismatch_reports') ?? [];
+    // Always persist locally in secure storage.
+    final existing = await EncryptionService.secureRead('barcode_mismatch_reports');
+    final log = existing != null
+        ? (jsonDecode(existing) as List<dynamic>).cast<String>()
+        : <String>[];
     log.add(json.encode(reportData));
-    await prefs.setStringList('barcode_mismatch_reports', log);
+    await EncryptionService.secureWrite(
+        'barcode_mismatch_reports', json.encode(log));
 
-    // POST to Discord webhook
-    try {
-      final fields = <Map<String, dynamic>>[
-        {'name': 'Barcode', 'value': widget.barcode ?? '—', 'inline': true},
-        {'name': 'Returned as', 'value': comicLabel, 'inline': false},
-        if (note.isNotEmpty) {'name': 'User note', 'value': note, 'inline': false},
-      ];
+    // POST to Discord webhook — only if URL is a valid Discord endpoint.
+    if (_reportWebhookUrl.isNotEmpty &&
+        _reportWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+      try {
+        final fields = <Map<String, dynamic>>[
+          {'name': 'Barcode', 'value': widget.barcode ?? '—', 'inline': true},
+          {'name': 'Returned as', 'value': comicLabel, 'inline': false},
+          if (note.isNotEmpty) {'name': 'User note', 'value': note, 'inline': false},
+        ];
 
-      await http
-          .post(
-            Uri.parse(_reportWebhookUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({
-              'embeds': [
-                {
-                  'title': '🚩 Wrong Comic Report',
-                  'color': 0xE74C3C,
-                  'fields': fields,
-                  'footer': {'text': 'Comic Vault'},
-                  'timestamp': timestamp,
-                }
-              ]
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-    } catch (_) {}
+        await http
+            .post(
+              Uri.parse(_reportWebhookUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({
+                'embeds': [
+                  {
+                    'title': '🚩 Wrong Comic Report',
+                    'color': 0xE74C3C,
+                    'fields': fields,
+                    'footer': {'text': 'Comic Vault'},
+                    'timestamp': timestamp,
+                  }
+                ]
+              }),
+            )
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {}
+    }
 
     return reportData;
   }

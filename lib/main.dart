@@ -7,6 +7,7 @@ import 'theme/app_colors.dart';
 import 'theme/services/database_service.dart';
 import 'theme/services/cover_palette_service.dart';
 import 'theme/services/app_settings.dart';
+import 'theme/services/encryption_service.dart';
 import 'REST API/screens/splash_screen.dart';
 
 void main() async {
@@ -19,7 +20,10 @@ void main() async {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
-  // Initialise services in parallel — DB and palette cache are independent
+  // Encryption must be ready before the database (which encrypts fields on write).
+  await EncryptionService.instance.init();
+
+  // Initialise remaining services in parallel — independent of each other.
   await Future.wait([
     DatabaseService.instance.init(),
     CoverPaletteService.instance.init(),

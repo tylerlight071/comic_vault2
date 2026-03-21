@@ -10,11 +10,11 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/models/home_layout.dart';
 import '../../theme/models/comic.dart';
 import '../../theme/models/shelf_config.dart';
 import '../../theme/services/app_settings.dart';
+import '../../theme/services/encryption_service.dart';
 import '../../theme/typography.dart';
 
 import '../../../utils/bottom_bouncing_scroll_physics.dart';
@@ -71,9 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadPersistedSettings() async {
-    final prefs   = await SharedPreferences.getInstance();
     final shelves = await ShelfConfig.load();
-    final apiKey  = prefs.getString('comic_vine_api_key') ?? '';
+    final apiKey  = await EncryptionService.secureRead('comic_vine_api_key') ?? '';
     if (mounted) {
       setState(() {
         _shelves = shelves;
@@ -83,8 +82,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveApiKey(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('comic_vine_api_key', value.trim());
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await EncryptionService.secureDelete('comic_vine_api_key');
+    } else {
+      await EncryptionService.secureWrite('comic_vine_api_key', trimmed);
+    }
   }
 
   Future<void> _toggleShelf(String key, bool value) async {
@@ -336,14 +339,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_exporting) return;
     AppHaptics.medium();
     setState(() => _exporting = true);
+    File? file;
     try {
       final library  = await DatabaseService.instance.getAllComics();
       final wishlist = await DatabaseService.instance.getWishlist();
       final all = [...library, ...wishlist];
       final payload = const JsonEncoder.withIndent('  ')
           .convert(all.map((c) => c.toMap()).toList());
-      final dir  = await getTemporaryDirectory();
-      final file = File('${dir.path}/comic_vault_backup.json');
+      final dir = await getTemporaryDirectory();
+      file = File('${dir.path}/comic_vault_backup.json');
       await file.writeAsString(payload);
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/json')],
@@ -352,6 +356,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) _snack('Export failed: $e');
     } finally {
+      // Always delete the temp file so it doesn't linger in the cache dir.
+      try { await file?.delete(); } catch (_) {}
       if (mounted) setState(() => _exporting = false);
     }
   }
@@ -412,22 +418,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true || !mounted) return;
     setState(() => _importing = true);
     try {
-      final list = jsonDecode(ctrl.text) as List<dynamic>;
+      final decoded = jsonDecode(ctrl.text);
+      if (decoded is! List) throw const FormatException('Expected a JSON array');
       int imported = 0;
-      for (final item in list) {
+      int skipped  = 0;
+      for (final item in decoded) {
         try {
-          final map = Map<String, dynamic>.from(item as Map);
+          if (item is! Map) { skipped++; continue; }
+          final map = Map<String, dynamic>.from(item);
+          // Required fields validation
+          final comicVineId = map['comicVineId'];
+          final title       = map['title'];
+          final seriesName  = map['seriesName'];
+          if (comicVineId is! String || comicVineId.isEmpty ||
+              title       is! String ||
+              seriesName  is! String) {
+            skipped++;
+            continue;
+          }
           map.remove('id'); // let DB assign a new id
-          final comic = Comic.fromMap({...map, 'addedDate': map['addedDate'] ?? DateTime.now().toIso8601String()});
+          map['addedDate'] = map['addedDate'] ?? DateTime.now().toIso8601String();
+          final comic  = Comic.fromMap(map);
           final exists = await DatabaseService.instance.comicExists(comic.comicVineId);
           if (!exists) {
             await DatabaseService.instance.insertComic(comic);
             imported++;
           }
-        } catch (_) {}
+        } catch (_) { skipped++; }
       }
       widget.onDataChanged();
-      if (mounted) _snack('Imported $imported comic${imported == 1 ? '' : 's'}', icon: Icons.check_circle_rounded);
+      final msg = skipped > 0
+          ? 'Imported $imported comic${imported == 1 ? '' : 's'} ($skipped skipped)'
+          : 'Imported $imported comic${imported == 1 ? '' : 's'}';
+      if (mounted) _snack(msg, icon: Icons.check_circle_rounded);
     } catch (_) {
       if (mounted) _snack('Invalid JSON — check the file and try again.');
     } finally {

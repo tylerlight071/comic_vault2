@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/comic.dart';
 import 'comic_vine_service.dart';
+import 'encryption_service.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
@@ -16,7 +17,7 @@ class DatabaseService {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       join(dbPath, 'comic_vault.db'),
-      version: 8,
+      version: 9,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE comics (
@@ -197,6 +198,25 @@ class DatabaseService {
           try { await db.execute('ALTER TABLE comics ADD COLUMN loanedTo TEXT'); } catch (_) {}
           try { await db.execute('ALTER TABLE comics ADD COLUMN tags TEXT'); } catch (_) {}
         }
+        if (oldVersion < 9) {
+          // Encrypt existing plaintext notes and loanedTo values.
+          final enc = EncryptionService.instance;
+          final rows = await db.query('comics',
+              columns: ['id', 'notes', 'loanedTo']);
+          for (final row in rows) {
+            final notes    = row['notes']    as String?;
+            final loanedTo = row['loanedTo'] as String?;
+            final updates  = <String, dynamic>{};
+            if (notes    != null && !notes.startsWith('__enc__'))
+              updates['notes']    = enc.encrypt(notes);
+            if (loanedTo != null && !loanedTo.startsWith('__enc__'))
+              updates['loanedTo'] = enc.encrypt(loanedTo);
+            if (updates.isNotEmpty) {
+              await db.update('comics', updates,
+                  where: 'id = ?', whereArgs: [row['id']]);
+            }
+          }
+        }
       },
     );
   }
@@ -233,10 +253,28 @@ class DatabaseService {
     return _db!;
   }
 
+  // ── Field-level encryption helpers ────────────────────────────────────────
+
+  static Map<String, dynamic> _encryptRow(Map<String, dynamic> map) {
+    final enc = EncryptionService.instance;
+    final result = Map<String, dynamic>.from(map);
+    if (result['notes']    case final String v) result['notes']    = enc.encrypt(v);
+    if (result['loanedTo'] case final String v) result['loanedTo'] = enc.encrypt(v);
+    return result;
+  }
+
+  static Map<String, dynamic> _decryptRow(Map<String, dynamic> row) {
+    final enc = EncryptionService.instance;
+    final result = Map<String, dynamic>.from(row);
+    if (result['notes']    case final String v) result['notes']    = enc.decrypt(v);
+    if (result['loanedTo'] case final String v) result['loanedTo'] = enc.decrypt(v);
+    return result;
+  }
+
   // ── Library CRUD ──────────────────────────────────────────────────────────
 
   Future<int> insertComic(Comic comic) async {
-    final id = await _database.insert('comics', comic.toMap(),
+    final id = await _database.insert('comics', _encryptRow(comic.toMap()),
         conflictAlgorithm: ConflictAlgorithm.replace);
     try {
       await _database.insert('comics_fts', {
@@ -260,11 +298,11 @@ class DatabaseService {
       where: 'isWishlisted = 0',
       orderBy: 'addedDate DESC',
     );
-    return rows.map(Comic.fromMap).toList();
+    return rows.map((r) => Comic.fromMap(_decryptRow(r))).toList();
   }
 
   Future<void> updateComic(Comic comic) async {
-    await _database.update('comics', comic.toMap(),
+    await _database.update('comics', _encryptRow(comic.toMap()),
         where: 'id = ?', whereArgs: [comic.id]);
     try {
       await _database.insert('comics_fts', {
@@ -324,7 +362,7 @@ class DatabaseService {
         whereArgs: [comicVineId],
         limit: 1);
     if (rows.isEmpty) return null;
-    return Comic.fromMap(rows.first);
+    return Comic.fromMap(_decryptRow(rows.first));
   }
 
   // ── Wishlist ──────────────────────────────────────────────────────────────
@@ -333,7 +371,7 @@ class DatabaseService {
     final rows = await _database.query('comics',
         where: 'isWishlisted = 1',
         orderBy: 'seriesName ASC, CAST(issueNumber AS REAL) ASC');
-    return rows.map(Comic.fromMap).toList();
+    return rows.map((r) => Comic.fromMap(_decryptRow(r))).toList();
   }
 
   Future<bool> isOnWishlist(String comicVineId) async {
@@ -479,7 +517,7 @@ class DatabaseService {
         limit: limit,
         offset: offset,
       );
-      return rows.map(Comic.fromMap).toList();
+      return rows.map((r) => Comic.fromMap(_decryptRow(r))).toList();
     }
 
     final trimmedQuery = query.trim();
@@ -554,7 +592,7 @@ class DatabaseService {
       );
     }
 
-    return rows.map(Comic.fromMap).toList();
+    return rows.map((r) => Comic.fromMap(_decryptRow(r))).toList();
   }
 
   // ── Barcode Lookup ────────────────────────────────────────────────────────
@@ -565,19 +603,19 @@ class DatabaseService {
         where: 'barcode = ? AND isWishlisted = 0',
         whereArgs: [normalized],
         limit: 1);
-    if (rows.isNotEmpty) return Comic.fromMap(rows.first);
+    if (rows.isNotEmpty) return Comic.fromMap(_decryptRow(rows.first));
     final rows2 = await _database.query('comics',
         where: 'barcode = ? AND isWishlisted = 0',
         whereArgs: [barcode],
         limit: 1);
-    return rows2.isNotEmpty ? Comic.fromMap(rows2.first) : null;
+    return rows2.isNotEmpty ? Comic.fromMap(_decryptRow(rows2.first)) : null;
   }
 
   Future<List<Comic>> getComicsByBarcodePrefix(String prefix) async {
     final rows = await _database.query('comics',
         where: 'barcode LIKE ? AND isWishlisted = 0',
         whereArgs: ['$prefix%']);
-    return rows.map(Comic.fromMap).toList();
+    return rows.map((r) => Comic.fromMap(_decryptRow(r))).toList();
   }
 
   String _normalizeBarcode(String barcode) {

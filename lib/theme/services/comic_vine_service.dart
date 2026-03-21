@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/comic.dart';
 import 'database_service.dart';
+import 'encryption_service.dart';
 
 class SearchResult {
   final List<Comic> comics;
@@ -54,10 +55,24 @@ class ComicVineService {
   static const String _envApiKey =
       String.fromEnvironment('COMIC_VINE_API_KEY', defaultValue: '');
 
+  static const _apiKeyStorageKey = 'comic_vine_api_key';
+
   Future<String> _apiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    final custom = prefs.getString('comic_vine_api_key')?.trim();
-    if (custom != null && custom.isNotEmpty) return custom;
+    // Prefer the key from secure storage (user-entered via Settings).
+    // On first run after the M1 migration, move any key still sitting in
+    // SharedPreferences into secure storage and remove it from there.
+    var custom = await EncryptionService.secureRead(_apiKeyStorageKey);
+    if (custom == null || custom.isEmpty) {
+      // Migration: check legacy SharedPreferences location.
+      final prefs = await SharedPreferences.getInstance();
+      final legacy = prefs.getString('comic_vine_api_key')?.trim();
+      if (legacy != null && legacy.isNotEmpty) {
+        await EncryptionService.secureWrite(_apiKeyStorageKey, legacy);
+        await prefs.remove('comic_vine_api_key');
+        custom = legacy;
+      }
+    }
+    if (custom != null && custom.trim().isNotEmpty) return custom.trim();
     if (_envApiKey.isNotEmpty) return _envApiKey;
     throw Exception(
       'No Comic Vine API key configured. '
@@ -68,7 +83,7 @@ class ComicVineService {
   Future<Map<String, dynamic>> _get(Uri uri) async {
     final response = await http
         .get(uri, headers: {'User-Agent': 'ComicVault/1.0'})
-        .timeout(const Duration(seconds: 20));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
     final body = json.decode(response.body) as Map<String, dynamic>;
     if ((body['status_code'] as int?) != null &&

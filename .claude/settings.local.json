@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib -type f -name *.dart)",
+      "Bash(find /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/ios -maxdepth 3 -name Info.plist -o -name *.swift)",
+      "Bash(grep -r \"print\\\\|log\\\\|println\" /c/Users/tyler/OneDrive/Documents/Coding/comic_vault2/lib/*.dart)"
+    ]
+  }
+}

@@ -73,7 +73,35 @@ class _ScannerScreenState extends State<ScannerScreen>
         clean.length != 17 && clean.length != 18) {
       return null;
     }
+
+    // Validate checksum on the base barcode portion.
+    final base = clean.length == 17 ? clean.substring(0, 12)
+               : clean.length == 18 ? clean.substring(0, 13)
+               : clean;
+    if (!_isValidChecksum(base)) return null;
+
     return clean;
+  }
+
+  /// Returns true if the barcode passes its standard checksum.
+  /// Supports UPC-A (12 digits), EAN-13 (13 digits), and EAN-8 (8 digits).
+  static bool _isValidChecksum(String barcode) {
+    if (barcode.length != 8 && barcode.length != 12 && barcode.length != 13) {
+      return true; // Unknown format — pass through
+    }
+    final d = barcode.split('').map(int.parse).toList();
+    final last = d.length - 1;
+    int sum = 0;
+    for (int i = 0; i < last; i++) {
+      // UPC-A / EAN-8: even indices (0-based) × 3, odd × 1
+      // EAN-13:        even indices × 1, odd × 3
+      final weight = barcode.length == 13
+          ? (i.isEven ? 1 : 3)
+          : (i.isEven ? 3 : 1);
+      sum += d[i] * weight;
+    }
+    final check = (10 - (sum % 10)) % 10;
+    return check == d[last];
   }
 
   void _selectFromHistory(String barcode) {

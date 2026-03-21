@@ -690,7 +690,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   static const String _reportWebhookUrl =
       String.fromEnvironment('DISCORD_WEBHOOK_URL', defaultValue: '');
 
+  static bool _isValidWebhook(String url) =>
+      url.startsWith('https://discord.com/api/webhooks/');
+
   void _sendNewBarcodeMappingLog(String barcode, Comic comic) async {
+    if (_reportWebhookUrl.isEmpty || !_isValidWebhook(_reportWebhookUrl)) return;
     final label =
         '${comic.seriesName} #${comic.issueNumber ?? "?"} — ${comic.title}';
     try {
@@ -719,6 +723,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   void _sendCorrectComicFollowUp(
       Map<String, dynamic> report, Comic correct) async {
+    if (_reportWebhookUrl.isEmpty || !_isValidWebhook(_reportWebhookUrl)) return;
     final correctLabel =
         '${correct.seriesName} #${correct.issueNumber ?? "?"} — ${correct.title}';
     try {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        Block all cleartext (HTTP) traffic app-wide.
+        Only trust system CAs — user-installed certificates (e.g. from a
+        proxy / MITM tool) are not trusted, which protects API keys and
+        user data in transit even on developer devices.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
