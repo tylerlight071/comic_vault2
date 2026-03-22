@@ -697,16 +697,28 @@ class DatabaseService {
 
   Future<Comic?> getComicByBarcode(String barcode) async {
     final normalized = _normalizeBarcode(barcode);
-    final rows = await _database.query('comics',
-        where: 'barcode = ? AND isWishlisted = 0',
-        whereArgs: [normalized],
-        limit: 1);
-    if (rows.isNotEmpty) return Comic.fromMap(_decryptRow(rows.first));
-    final rows2 = await _database.query('comics',
-        where: 'barcode = ? AND isWishlisted = 0',
-        whereArgs: [barcode],
-        limit: 1);
-    return rows2.isNotEmpty ? Comic.fromMap(_decryptRow(rows2.first)) : null;
+
+    // Build a deduplicated list of candidates to try in order:
+    // 1. The normalised form (digits-only, validated length).
+    // 2. The raw input as-is (scanner may include dashes / spaces).
+    // 3. EAN-13 → UPC-A: if the normalised form is 13 digits starting with '0',
+    //    drop the leading zero to get the 12-digit UPC-A equivalent, because the
+    //    comic may have been stored under one encoding and scanned in the other.
+    final candidates = <String>[normalized];
+    if (barcode != normalized) candidates.add(barcode);
+    if (normalized.length == 13 && normalized.startsWith('0')) {
+      final upcA = normalized.substring(1);
+      if (!candidates.contains(upcA)) candidates.add(upcA);
+    }
+
+    for (final candidate in candidates) {
+      final rows = await _database.query('comics',
+          where: 'barcode = ? AND isWishlisted = 0',
+          whereArgs: [candidate],
+          limit: 1);
+      if (rows.isNotEmpty) return Comic.fromMap(_decryptRow(rows.first));
+    }
+    return null;
   }
 
   Future<List<Comic>> getComicsByBarcodePrefix(String prefix) async {

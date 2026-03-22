@@ -37,26 +37,41 @@ class _ReadingLogScreenState extends State<ReadingLogScreen> {
 
   Future<void> _load() async {
     final all = await DatabaseService.instance.getAllComics();
-    final read = all
-        .where((c) => c.isRead && c.readDate != null)
-        .toList()
-      ..sort((a, b) => b.readDate!.compareTo(a.readDate!));
+    // Include every read comic regardless of whether readDate is populated.
+    // Comics added before v7 (which introduced readDate) have isRead=true but
+    // readDate=null — they belong in the log too, just without a known date.
+    final read = all.where((c) => c.isRead).toList()
+      ..sort((a, b) {
+        // Comics with a known date sort newest-first; unknowns go last.
+        if (a.readDate == null && b.readDate == null) return 0;
+        if (a.readDate == null) return 1;
+        if (b.readDate == null) return -1;
+        return b.readDate!.compareTo(a.readDate!);
+      });
     if (mounted) setState(() { _read = read; _loading = false; });
   }
 
   // ── Grouping ──────────────────────────────────────────────────────────────
 
+  static const _unknownDateLabel = 'Unknown Date';
+
   /// Groups comics into month buckets: key = 'MMMM yyyy' (e.g. 'March 2026').
+  /// Comics with no readDate are placed in a final 'Unknown Date' bucket.
   List<_MonthGroup> get _groups {
     final map = <String, List<Comic>>{};
     for (final c in _read) {
-      final key = _monthKey(c.readDate!);
+      final key = c.readDate != null ? _monthKey(c.readDate!) : _unknownDateLabel;
       map.putIfAbsent(key, () => []).add(c);
     }
-    // Already sorted newest-first, so insertion order gives correct ordering.
-    return map.entries
+    // Pull out the unknown-date bucket so it always sorts last.
+    final unknown = map.remove(_unknownDateLabel);
+    final groups = map.entries
         .map((e) => _MonthGroup(label: e.key, comics: e.value))
         .toList();
+    if (unknown != null) {
+      groups.add(_MonthGroup(label: _unknownDateLabel, comics: unknown));
+    }
+    return groups;
   }
 
   String _monthKey(DateTime d) {
@@ -316,8 +331,6 @@ class _LogRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dayStr = _dayStr(comic.readDate!);
-
     return Pressable(
       onTap: onTap,
       haptic: HapticStyle.light,
@@ -403,28 +416,30 @@ class _LogRow extends StatelessWidget {
           // Date badge
           Padding(
             padding: const EdgeInsets.only(right: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(dayStr,
-                    style: tDisplay(18,
-                        weight: FontWeight.w700,
-                        letterSpacing: -0.5)),
-                Text(_shortMonth(comic.readDate!),
-                    style: tUi(10,
-                        color: AppColors.textTertiary,
-                        weight: FontWeight.w500,
-                        letterSpacing: 0.5)),
-              ],
-            ),
+            child: comic.readDate != null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                          comic.readDate!.day.toString().padLeft(2, '0'),
+                          style: tDisplay(18,
+                              weight: FontWeight.w700,
+                              letterSpacing: -0.5)),
+                      Text(_shortMonth(comic.readDate!),
+                          style: tUi(10,
+                              color: AppColors.textTertiary,
+                              weight: FontWeight.w500,
+                              letterSpacing: 0.5)),
+                    ],
+                  )
+                : const Icon(Icons.help_outline_rounded,
+                    color: AppColors.textDisabled, size: 18),
           ),
         ]),
       ),
     );
   }
-
-  String _dayStr(DateTime d) => d.day.toString().padLeft(2, '0');
 
   String _shortMonth(DateTime d) {
     const m = [

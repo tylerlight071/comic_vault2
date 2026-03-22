@@ -73,10 +73,11 @@ class _LibraryScreenState extends State<LibraryScreen>
   List<Comic> _all = [];
   bool _loading = true;
 
-  _SortMode   _sort      = _SortMode.dateAdded;
-  _FilterMode _filter    = _FilterMode.all;
-  _ViewMode   _view      = _ViewMode.grid;
+  _SortMode   _sort            = _SortMode.dateAdded;
+  _FilterMode _filter          = _FilterMode.all;
+  _ViewMode   _view            = _ViewMode.grid;
   String?     _activeTag;
+  String?     _activePublisher;
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
@@ -97,13 +98,25 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   // Returns true when anything deviates from the defaults
   bool get _hasActiveFilters =>
-      _sort != _SortMode.dateAdded || _filter != _FilterMode.all || _activeTag != null;
+      _sort != _SortMode.dateAdded || _filter != _FilterMode.all ||
+      _activeTag != null || _activePublisher != null;
 
   /// All unique tags across the library, sorted alphabetically.
   List<String> get _allTags {
     final set = <String>{};
     for (final c in _all) {
       set.addAll(c.tagList);
+    }
+    return set.toList()..sort();
+  }
+
+  /// All unique publishers across the library, sorted alphabetically.
+  List<String> get _allPublishers {
+    final set = <String>{};
+    for (final c in _all) {
+      if (c.publisher != null && c.publisher!.isNotEmpty) {
+        set.add(c.publisher!);
+      }
     }
     return set.toList()..sort();
   }
@@ -165,6 +178,10 @@ class _LibraryScreenState extends State<LibraryScreen>
 
     if (_activeTag != null) {
       list = list.where((c) => c.tagList.contains(_activeTag)).toList();
+    }
+
+    if (_activePublisher != null) {
+      list = list.where((c) => c.publisher == _activePublisher).toList();
     }
 
     final q = _query.trim().toLowerCase();
@@ -257,10 +274,12 @@ class _LibraryScreenState extends State<LibraryScreen>
 
     // Capture current state so the sheet can work on a local copy
     // and only apply on "Done" — feel free to change to live-apply if preferred.
-    var tempSort   = _sort;
-    var tempFilter = _filter;
-    var tempTag    = _activeTag;
-    final tags     = _allTags;
+    var tempSort      = _sort;
+    var tempFilter    = _filter;
+    var tempTag       = _activeTag;
+    var tempPublisher = _activePublisher;
+    final tags        = _allTags;
+    final publishers  = _allPublishers;
 
     showModalBottomSheet(
       context: context,
@@ -332,14 +351,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                     const Spacer(),
                     if (tempSort != _SortMode.dateAdded ||
                         tempFilter != _FilterMode.all ||
-                        tempTag != null)
+                        tempTag != null ||
+                        tempPublisher != null)
                       Pressable(
                         onTap: () {
                           AppHaptics.light();
                           setSheetState(() {
-                            tempSort   = _SortMode.dateAdded;
-                            tempFilter = _FilterMode.all;
-                            tempTag    = null;
+                            tempSort      = _SortMode.dateAdded;
+                            tempFilter    = _FilterMode.all;
+                            tempTag       = null;
+                            tempPublisher = null;
                           });
                         },
                         haptic: HapticStyle.none,
@@ -431,6 +452,30 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                 ],
 
+                // ── Publishers ────────────────────────────────────────────
+                if (publishers.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('PUBLISHER',
+                        style: tUi(10, color: AppColors.textTertiary,
+                            weight: FontWeight.w700, letterSpacing: 1.4)),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: publishers.map((p) => _chip(
+                        label: p,
+                        active: tempPublisher == p,
+                        onTap: () => setSheetState(() =>
+                            tempPublisher = tempPublisher == p ? null : p),
+                      )).toList(),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
 
                 // ── Apply ─────────────────────────────────────────────────
@@ -440,9 +485,10 @@ class _LibraryScreenState extends State<LibraryScreen>
                     onTap: () {
                       AppHaptics.medium();
                       setState(() {
-                        _sort      = tempSort;
-                        _filter    = tempFilter;
-                        _activeTag = tempTag;
+                        _sort            = tempSort;
+                        _filter          = tempFilter;
+                        _activeTag       = tempTag;
+                        _activePublisher = tempPublisher;
                         _invalidateCache();
                       });
                       Navigator.pop(ctx);

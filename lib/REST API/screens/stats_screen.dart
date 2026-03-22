@@ -139,6 +139,86 @@ class _StatsScreenState extends State<StatsScreen> {
     return rated.map((c) => c.starRating).reduce((a, b) => a + b) / rated.length;
   }
 
+  // ── Reading streak ────────────────────────────────────────────────────────
+
+  /// Returns the ISO week number (1–53) for a given date.
+  static int _isoWeek(DateTime d) {
+    // Days since the nearest Thursday (ISO weeks start on Monday).
+    final thursday = d.subtract(Duration(days: (d.weekday - 4) % 7));
+    final startOfYear = DateTime(thursday.year, 1, 1);
+    final diff = thursday.difference(startOfYear).inDays;
+    return (diff / 7).floor() + 1;
+  }
+
+  /// A week identifier as 'YYYY-WW' (ISO year + week).
+  static String _weekKey(DateTime d) {
+    final thursday = d.subtract(Duration(days: (d.weekday - 4) % 7));
+    final week = _isoWeek(d);
+    return '${thursday.year}-${week.toString().padLeft(2, '0')}';
+  }
+
+  /// Consecutive weeks ending in this week (or last week) where at least one
+  /// comic was finished. Returns 0 if nothing was read recently.
+  int get _currentStreak {
+    final readDates = _library
+        .where((c) => c.readDate != null)
+        .map((c) => _weekKey(c.readDate!))
+        .toSet();
+    if (readDates.isEmpty) return 0;
+
+    final now = DateTime.now();
+    int streak = 0;
+
+    // Walk backwards week by week starting from this week.
+    for (var i = 0; i <= 520; i++) {
+      final weekDate = now.subtract(Duration(days: i * 7));
+      final key = _weekKey(weekDate);
+      if (readDates.contains(key)) {
+        streak++;
+      } else if (streak == 0 && i == 1) {
+        // Grace: allow a gap of exactly one week (this week not yet read).
+        continue;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  /// Longest streak ever (in weeks).
+  int get _bestStreak {
+    final readDates = _library
+        .where((c) => c.readDate != null)
+        .map((c) => _weekKey(c.readDate!))
+        .toSet();
+    if (readDates.isEmpty) return 0;
+
+    final sorted = readDates.toList()..sort();
+    int best = 1;
+    int current = 1;
+
+    for (var i = 1; i < sorted.length; i++) {
+      // Parse the previous and current week keys to check adjacency.
+      final prev = sorted[i - 1].split('-');
+      final curr = sorted[i].split('-');
+      final prevYear = int.parse(prev[0]);
+      final prevWeek = int.parse(prev[1]);
+      final currYear = int.parse(curr[0]);
+      final currWeek = int.parse(curr[1]);
+
+      final adjacent = (currYear == prevYear && currWeek == prevWeek + 1) ||
+          (currYear == prevYear + 1 && prevWeek >= 52 && currWeek == 1);
+
+      if (adjacent) {
+        current++;
+        if (current > best) best = current;
+      } else {
+        current = 1;
+      }
+    }
+    return best;
+  }
+
   // ── This-year stats (requires readDate to be populated) ───────────────────
 
   int get _thisYear => DateTime.now().year;
@@ -165,6 +245,26 @@ class _StatsScreenState extends State<StatsScreen> {
         final bi = labels.indexOf(b.key);
         return ai.compareTo(bi);
       });
+  }
+
+  // ── Multi-year history ────────────────────────────────────────────────────
+
+  /// Past years that have at least one read comic, newest first, excluding
+  /// the current year (which is already shown in _buildThisYear).
+  List<_YearStat> get _pastYearStats {
+    final now = DateTime.now();
+    final grouped = <int, int>{};
+    for (final c in _library) {
+      if (c.readDate != null && c.readDate!.year != now.year) {
+        grouped[c.readDate!.year] = (grouped[c.readDate!.year] ?? 0) + 1;
+      }
+    }
+    // Also include years where a goal was set but nothing was read — we can't
+    // know those here without async SharedPreferences calls, so we only surface
+    // years with actual reads. Goals are loaded in _buildPastYears on demand.
+    final entries = grouped.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
+    return entries.map((e) => _YearStat(year: e.key, readCount: e.value)).toList();
   }
 
   // ── Series / publisher / etc. ──────────────────────────────────────────────
@@ -267,11 +367,19 @@ class _StatsScreenState extends State<StatsScreen> {
                     _buildSummaryGrid(),
                     const SizedBox(height: 28),
                     _buildReadingProgress(),
+                    if (_currentStreak > 0 || _bestStreak > 0) ...[
+                      const SizedBox(height: 28),
+                      _buildStreakSection(),
+                    ],
                     const SizedBox(height: 28),
                     _buildGoalSection(),
                     if (_readThisYear.isNotEmpty) ...[
                       const SizedBox(height: 28),
                       _buildThisYear(),
+                    ],
+                    if (_pastYearStats.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _buildPastYears(),
                     ],
                     if (_pricedCount > 0) ...[
                       const SizedBox(height: 28),
@@ -462,6 +570,57 @@ class _StatsScreenState extends State<StatsScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  // ── Reading streak ─────────────────────────────────────────────────────────
+
+  Widget _buildStreakSection() {
+    final current = _currentStreak;
+    final best    = _bestStreak;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${current}w',
+                  style: tDisplay(32,
+                      weight: FontWeight.w700, letterSpacing: -1.0)),
+              const SizedBox(height: 3),
+              Text('current streak',
+                  style: tUi(12,
+                      color: AppColors.textTertiary,
+                      weight: FontWeight.w400)),
+            ],
+          ),
+        ),
+        Container(width: 1, height: 40, color: AppColors.border),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${best}w',
+                    style: tDisplay(32,
+                        weight: FontWeight.w700, letterSpacing: -1.0)),
+                const SizedBox(height: 3),
+                Text('best streak',
+                    style: tUi(12,
+                        color: AppColors.textTertiary,
+                        weight: FontWeight.w400)),
+              ],
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -863,9 +1022,87 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  // ── Section label ─────────────────────────────────────────────────────────
-
   // ── Empty state ───────────────────────────────────────────────────────────
+
+  // ── Past years ─────────────────────────────────────────────────────────────
+
+  Widget _buildPastYears() {
+    final years = _pastYearStats;
+    if (years.isEmpty) return const SizedBox.shrink();
+    final max = years.map((y) => y.readCount).reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PREVIOUS YEARS',
+              style: tUi(10,
+                  color: AppColors.textTertiary,
+                  weight: FontWeight.w700,
+                  letterSpacing: 1.6)),
+          const SizedBox(height: 14),
+          ...years.asMap().entries.map((entry) {
+            final i    = entry.key;
+            final stat = entry.value;
+            final frac = max == 0 ? 0.0 : stat.readCount / max;
+            return Padding(
+              padding: EdgeInsets.only(bottom: i == years.length - 1 ? 0 : 12),
+              child: Row(children: [
+                SizedBox(
+                  width: 36,
+                  child: Text('${stat.year}',
+                      style: tUi(12,
+                          color: AppColors.textSecondary,
+                          weight: FontWeight.w500)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Stack(children: [
+                      Container(height: 6, color: AppColors.surface3),
+                      FractionallySizedBox(
+                        widthFactor: frac,
+                        child: Container(
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.accent.withOpacity(0.4),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 28,
+                  child: Text('${stat.readCount}',
+                      textAlign: TextAlign.end,
+                      style: tUi(12,
+                          color: AppColors.textTertiary,
+                          weight: FontWeight.w600)),
+                ),
+              ]),
+            );
+          }),
+        ],
+      ),
+    );
+  }
 
   Widget _buildEmpty() => Center(
         child: Padding(
@@ -891,4 +1128,12 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
         ),
       );
+}
+
+// ── Supporting data class ──────────────────────────────────────────────────────
+
+class _YearStat {
+  final int year;
+  final int readCount;
+  const _YearStat({required this.year, required this.readCount});
 }
