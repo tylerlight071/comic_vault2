@@ -117,12 +117,11 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
 
-              // Icon mark — solid filled, matches app logo style
+              // App logo
               Container(
                 width: 76,
                 height: 76,
                 decoration: BoxDecoration(
-                  color: AppColors.textPrimary,
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: [
                     BoxShadow(
@@ -138,10 +137,14 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.menu_book_rounded,
-                  color: AppColors.bg,
-                  size: 34,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 76,
+                    height: 76,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               )
                   .animate()

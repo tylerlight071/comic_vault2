@@ -115,15 +115,14 @@ class _AppDrawer extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
                 child: Row(children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.textPrimary,
-                      borderRadius: BorderRadius.circular(10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 34,
+                      height: 34,
+                      fit: BoxFit.cover,
                     ),
-                    child: Icon(Icons.menu_book_rounded,
-                        color: AppColors.bg, size: 17),
                   ),
                   const SizedBox(width: 11),
                   Text('ComicVault',
