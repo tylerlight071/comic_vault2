@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../theme/models/home_layout.dart';
 import '../../../theme/models/comic.dart';
 import '../../../theme/models/shelf_config.dart';
@@ -368,60 +369,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _importData() async {
     if (_importing) return;
     AppHaptics.medium();
-    final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.bgElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Import from JSON', style: tUi(17, weight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Paste the contents of a Comic Vault backup file below. Existing comics with the same ID will be skipped.',
-              style: tUi(13, color: AppColors.textSecondary, weight: FontWeight.w400, height: 1.55),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: ctrl,
-              maxLines: 6,
-              style: tUi(12, color: AppColors.textPrimary, weight: FontWeight.w400, height: 1.5),
-              decoration: InputDecoration(
-                hintText: 'Paste JSON here…',
-                hintStyle: tUi(12, color: AppColors.textDisabled),
-                filled: true,
-                fillColor: AppColors.surface2,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: tUi(14, color: AppColors.textSecondary, weight: FontWeight.w600)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Import', style: tUi(14, color: AppColors.textPrimary, weight: FontWeight.w700)),
-          ),
-        ],
-      ),
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
     );
-    if (ok != true || !mounted) return;
+    if (result == null || result.files.isEmpty || !mounted) return;
+
+    final bytes = result.files.first.bytes;
+    if (bytes == null) {
+      if (mounted) _snack('Could not read file — try again.');
+      return;
+    }
+
     setState(() => _importing = true);
     try {
-      final decoded = jsonDecode(ctrl.text);
+      final decoded = jsonDecode(String.fromCharCodes(bytes));
       if (decoded is! List) throw const FormatException('Expected a JSON array');
       int imported = 0;
       int skipped  = 0;
