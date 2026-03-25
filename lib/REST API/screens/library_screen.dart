@@ -320,7 +320,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               );
 
-          return Container(
+          return ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
+            child: Container(
             decoration: const BoxDecoration(
               color: AppColors.bgElevated,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -511,6 +515,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               ],
             ),
+          ),
           );
         },
       ),

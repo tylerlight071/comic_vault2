@@ -175,8 +175,8 @@ class _StatsScreenState extends State<StatsScreen> {
       final key = _weekKey(weekDate);
       if (readDates.contains(key)) {
         streak++;
-      } else if (streak == 0 && i == 1) {
-        // Grace: allow a gap of exactly one week (this week not yet read).
+      } else if (streak == 0 && i == 0) {
+        // Grace: this week may not be over yet — check last week before giving up.
         continue;
       } else {
         break;
